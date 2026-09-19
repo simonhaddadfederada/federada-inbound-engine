@@ -2,6 +2,9 @@
 
 Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 
+## Seguridad
+- [x] **RLS activado en las 4 tablas** (`supabase/migrations/0002_enable_rls.sql`) — se detectó que la clave pública podía leer y escribir libremente (nombres y teléfonos incluidos) porque la migración inicial nunca activó Row Level Security. Verificado antes y después del fix con inserciones/lecturas reales: antes la clave pública leía todo, ahora devuelve vacío y rechaza inserciones (`42501`); la clave secreta y las Edge Functions siguen funcionando exactamente igual (probado con el formulario real después del cambio).
+
 ## Fase 0 — Fundaciones
 - [x] Estructura del repositorio
 - [x] README completo

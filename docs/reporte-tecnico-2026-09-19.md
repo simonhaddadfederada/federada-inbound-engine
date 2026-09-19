@@ -3,6 +3,17 @@
 Fecha del reporte: 19 de septiembre de 2026.
 Generado revisando el repositorio real (código, tests, migraciones, configuración desplegada), no solo la memoria de la conversación.
 
+> **Actualización (mismo día, después de generado este reporte):** el
+> hallazgo de seguridad 🔴 "RLS deshabilitado" (secciones 10, 18, 19, 20,
+> 23, 24, 27) **ya fue corregido y verificado** — se aplicó la migración
+> `0002_enable_rls.sql`, que activa Row Level Security en las 4 tablas sin
+> ninguna política para la `anon key`. Se confirmó con pruebas reales que:
+> la clave pública ya no puede leer ni escribir (`42501`, RLS policy
+> violation), y que la función `intake-landing` sigue guardando leads
+> normalmente porque usa la `service_role key` (que siempre atraviesa RLS).
+> El resto del texto de este reporte describe el estado *previo* al fix,
+> para que quede registro de qué se encontró y cómo se resolvió.
+
 ---
 
 # 1. OBJETIVO GENERAL DEL PROYECTO
@@ -582,7 +593,7 @@ No hay prompts escritos todavía en el código — son solo menciones de diseño
 Ordenado por prioridad real (no solo por fase):
 
 ```
-[ ] 🔴 Activar RLS en las 4 tablas de Supabase y restringir el acceso de la anon key (seguridad, ver sección 19)
+[x] 🔴 Activar RLS en las 4 tablas de Supabase y restringir el acceso de la anon key — RESUELTO el mismo día (ver actualización al inicio del reporte)
 [ ] 🔴 Completar la verificación de negocio de Meta Business (datos legales reales del usuario)
 [ ] 🔴 Grabar los 3 videos de demostración para el App Review de Instagram
 [ ] 🔴 Enviar la solicitud de App Review una vez completos los dos puntos anteriores
@@ -707,7 +718,7 @@ supabase secrets set NOMBRE_VARIABLE="valor"
 | Área | Estado |
 |---|---|
 | Backend | ✅ listo (Fase 1), 🟡 parcial (Fase 2, código listo sin tráfico real) |
-| Base de datos | 🟡 parcial (esquema y datos funcionan, pero falta RLS — ver seguridad) |
+| Base de datos | ✅ listo (esquema completo + RLS activado y verificado) |
 | Meta (cuenta/app) | 🟡 parcial (app creada, permisos pedidos, falta App Review) |
 | Instagram | 🟡 parcial (webhook probado con eventos simulados, no con tráfico real) |
 | Facebook | ❌ pendiente |
