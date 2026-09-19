@@ -84,22 +84,23 @@ federada-inbound-engine/
 ├── README.md                    este archivo
 ├── TASKS.md                     lista de tareas por fase
 ├── .env.example                 variables de entorno necesarias (nunca poner claves reales acá)
+├── index.html                    landing page con el formulario (raíz, para GitHub Pages)
 ├── docs/
 │   ├── architecture.md          arquitectura completa y diagramas
 │   ├── accounts-and-apis.md     cuentas, permisos, paso a paso
 │   ├── costs.md                 qué es gratis, qué tiene costo, límites
-│   └── scoring.md                cómo funciona el puntaje de leads
-├── supabase/
-│   ├── migrations/               esquema de la base de datos (SQL)
-│   └── functions/
-│       ├── _shared/              lógica compartida (score, tipos, telegram)
-│       │   ├── scoring.ts
-│       │   ├── scoring.test.ts
-│       │   └── telegram.ts
-│       └── intake-landing/       función que recibe el formulario
-│           └── index.ts
-└── landing/
-    └── index.html                landing page con el formulario
+│   ├── scoring.md                cómo funciona el puntaje de leads
+│   └── setup-fase-1.md           guía paso a paso de despliegue
+└── supabase/
+    ├── migrations/               esquema de la base de datos (SQL)
+    └── functions/
+        ├── _shared/              lógica compartida (score, tipos, telegram)
+        │   ├── scoring.ts / scoring.test.ts
+        │   ├── intake.ts / intake.test.ts
+        │   ├── telegram.ts / telegram.test.ts
+        │   └── types.ts
+        └── intake-landing/       función que recibe el formulario
+            └── index.ts
 ```
 
 ## Cómo se prueba

@@ -87,7 +87,8 @@ cualquiera sin ningún control.
 
 ## 7. Conectar la landing page con la función real
 
-En [`landing/index.html`](../landing/index.html), reemplazá:
+En [`index.html`](../index.html) (en la raíz del repo, para que GitHub Pages
+lo pueda servir), reemplazá:
 
 ```js
 const ENDPOINT_URL = "https://TU-PROYECTO.functions.supabase.co/intake-landing";
@@ -100,8 +101,10 @@ por tu URL real (te la muestra `supabase functions deploy` al terminar) y tu
 ## 8. Publicar la landing page en GitHub Pages
 
 1. Subí el repo a GitHub (`git remote add origin ...`, `git push`).
-2. En GitHub: **Settings → Pages → Source** → elegí la carpeta `/landing` en
-   la rama `main`.
+2. En GitHub: **Settings → Pages → Source** → "Deploy from a branch" → rama
+   `main`, carpeta **`/ (root)`** (GitHub Pages solo permite `/root` o
+   `/docs`; como `/docs` ya lo usamos para la documentación, el `index.html`
+   de la landing vive en la raíz del repo).
 3. GitHub te da una URL tipo `https://tuusuario.github.io/federada-inbound-engine/`.
 
 ## 9. Prueba end-to-end real (no te la doy por hecha sin verla)
