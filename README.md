@@ -3,6 +3,9 @@
 Sistema de captación y calificación de leads **inbound** para un asesor comercial
 de Federada Salud (Mendoza, Argentina).
 
+**Landing page en producción:** https://simonhaddadfederada.github.io/federada-inbound-engine/
+**Repositorio:** https://github.com/simonhaddadfederada/federada-inbound-engine
+
 ## Qué es esto (y qué NO es)
 
 - **NO** es un cotizador automático ni reemplaza la conversación de venta.

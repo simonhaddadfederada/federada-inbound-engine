@@ -19,7 +19,7 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 - [x] Bot de Telegram creado por el usuario — probado, el mensaje de prueba llegó ✅
 - [x] Migración aplicada en el proyecto real de Supabase — verificado con curl contra las 4 tablas (200 OK) ✅
 - [x] Edge Function desplegada en el proyecto real
-- [ ] Landing page publicada en GitHub Pages
+- [x] Landing page publicada en GitHub Pages — https://simonhaddadfederada.github.io/federada-inbound-engine/ (probado desde la URL real, lead confirmado en la base y limpiado después)
 - [x] **Prueba end-to-end real**: lead "Prueba Real" enviado a la función
       desplegada → score 105 → `contactar_ahora` → guardado en `leads`
       (verificado vía REST API) → alerta de Telegram recibida y confirmada
