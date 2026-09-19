@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cobertura de salud a tu medida | Federada Salud Mendoza</title>
+<style>
+  :root {
+    --brand: #0a6e4a;
+    --brand-dark: #064c33;
+    --ink: #1a1a1a;
+    --muted: #5f6b66;
+    --bg: #f5f8f6;
+    --card: #ffffff;
+    --border: #dfe7e3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  header {
+    background: var(--brand);
+    color: #fff;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 6px; font-size: 1.4rem; }
+  header p { margin: 0; opacity: 0.9; font-size: 0.95rem; }
+  main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 0.92rem; }
+  input[type="text"], input[type="tel"], select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+  .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .radio-group label {
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 20px;
+    margin: 0;
+    cursor: pointer;
+  }
+  .consent { display: flex; align-items: flex-start; gap: 8px; margin-top: 18px; }
+  .consent input { margin-top: 4px; }
+  .consent label { font-weight: 400; font-size: 0.85rem; color: var(--muted); margin: 0; }
+  button {
+    width: 100%;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-top: 20px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--brand-dark); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  #status { margin-top: 14px; font-size: 0.95rem; text-align: center; }
+  #status.ok { color: var(--brand-dark); }
+  #status.err { color: #b3261e; }
+  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>¿Querés saber si estás pagando de más por tu cobertura de salud?</h1>
+    <p>Contame tu situación y te escribo yo — sin compromiso.</p>
+  </header>
+
+  <main>
+    <form id="lead-form" class="card">
+      <label for="name">Nombre</label>
+      <input type="text" id="name" name="name" autocomplete="name" required />
+
+      <label for="locality">Localidad</label>
+      <input type="text" id="locality" name="locality" placeholder="Ej: Godoy Cruz, Mendoza" autocomplete="address-level2" />
+
+      <label>¿Cuál es tu situación?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="employmentType" value="dependencia" /> Relación de dependencia</label>
+        <label><input type="radio" name="employmentType" value="monotributo" /> Monotributo</label>
+        <label><input type="radio" name="employmentType" value="particular" /> Particular</label>
+      </div>
+
+      <label for="contributionApprox">¿Sabés cuánto aportás aproximadamente? (opcional)</label>
+      <input type="text" id="contributionApprox" name="contributionApprox" placeholder="Si no lo sabés, dejalo en blanco" />
+
+      <label>¿Es para vos solo/a o para tu grupo familiar?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="coverageFor" value="individual" /> Individual</label>
+        <label><input type="radio" name="coverageFor" value="grupo_familiar" /> Grupo familiar</label>
+      </div>
+
+      <label>¿Para cuándo te gustaría cambiar de cobertura?</label>
+      <select id="intentTimeframe" name="intentTimeframe">
+        <option value="sin_definir" selected>Todavía estoy averiguando</option>
+        <option value="inmediato">Lo antes posible</option>
+        <option value="1_3_meses">En 1 a 3 meses</option>
+        <option value="mas_de_3_meses">Más adelante</option>
+      </select>
+
+      <label for="phone">Teléfono (opcional, solo si querés que te contacte)</label>
+      <input type="tel" id="phone" name="phone" placeholder="261..." autocomplete="tel" />
+      <p class="hint">No compartimos tu teléfono con nadie. Se usa únicamente para que te contacte tu asesor.</p>
+
+      <div class="consent">
+        <input type="checkbox" id="consent" name="consent" required />
+        <label for="consent">Acepto ser contactado/a por un asesor de Federada Salud a partir de estos datos.</label>
+      </div>
+
+      <button type="submit" id="submit-btn">Quiero que me contacten</button>
+      <p id="status" role="status"></p>
+    </form>
+  </main>
+
+  <script>
+    // Reemplazar por la URL real de la Edge Function una vez desplegada en Supabase.
+    const ENDPOINT_URL = "https://TU-PROYECTO.functions.supabase.co/intake-landing";
+    const SUPABASE_ANON_KEY = "TU_ANON_KEY";
+
+    const params = new URLSearchParams(window.location.search);
+    const campaign = params.get("utm_campaign") || undefined;
+    const postRef = params.get("utm_content") || params.get("post") || undefined;
+
+    const form = document.getElementById("lead-form");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      statusEl.textContent = "";
+      statusEl.className = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Enviando...";
+
+      const fd = new FormData(form);
+      const payload = {
+        name: fd.get("name")?.toString().trim() || undefined,
+        locality: fd.get("locality")?.toString().trim() || undefined,
+        employmentType: fd.get("employmentType") || undefined,
+        contributionApprox: fd.get("contributionApprox")?.toString().trim() || undefined,
+        coverageFor: fd.get("coverageFor") || undefined,
+        intentTimeframe: fd.get("intentTimeframe") || undefined,
+        phone: fd.get("phone")?.toString().trim() || undefined,
+        consent: fd.get("consent") === "on",
+        campaign,
+        postRef,
+      };
+
+      try {
+        const res = await fetch(ENDPOINT_URL, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "No se pudo enviar el formulario");
+        }
+
+        statusEl.textContent = "¡Listo! En breve te contacto personalmente.";
+        statusEl.className = "ok";
+        form.reset();
+      } catch (err) {
+        statusEl.textContent = "Hubo un problema enviando tus datos. Probá de nuevo en unos minutos.";
+        statusEl.className = "err";
+        console.error(err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Quiero que me contacten";
+      }
+    });
+  </script>
+</body>
+</html>
