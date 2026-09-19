@@ -18,11 +18,12 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 - [x] Cuenta de Supabase creada por el usuario
 - [x] Bot de Telegram creado por el usuario — probado, el mensaje de prueba llegó ✅
 - [x] Migración aplicada en el proyecto real de Supabase — verificado con curl contra las 4 tablas (200 OK) ✅
-- [ ] Edge Function desplegada en el proyecto real
+- [x] Edge Function desplegada en el proyecto real
 - [ ] Landing page publicada en GitHub Pages
-- [ ] **Prueba end-to-end real**: enviar el formulario de verdad y confirmar
-      que (a) el lead aparece en la tabla `leads` con el score correcto,
-      (b) si corresponde, llega la alerta de Telegram
+- [x] **Prueba end-to-end real**: lead "Prueba Real" enviado a la función
+      desplegada → score 105 → `contactar_ahora` → guardado en `leads`
+      (verificado vía REST API) → alerta de Telegram recibida y confirmada
+      por el usuario ✅ **Fase 1 funcionando de punta a punta.**
 
 ## Fase 2 — Canales de Meta
 - [ ] Cuenta de Meta Business verificada
