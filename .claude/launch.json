@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4173", "--directory", "/Users/simonhaddad/Desktop/federada-inbound-engine"],
       "port": 4173
+    },
+    {
+      "name": "icon-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4175", "--directory", "/private/tmp/claude-501/-Users-simonhaddad-Desktop-federada-inbound-engine/65ac734f-7189-41bd-b2e5-8872bbd94b61/scratchpad"],
+      "port": 4175
     }
   ]
 }

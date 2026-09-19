@@ -33,9 +33,11 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 - [x] Webhook de Instagram (comentarios + DM, detección de palabra clave) — código escrito, 15 tests automáticos (firma HMAC + parseo de eventos), desplegado y **probado con un webhook simulado firmado de verdad**: guardó el lead y mandó la alerta de Telegram
 - [x] Webhook verificado y registrado en Meta (handshake ✓, campos `comments` y `messages` suscritos)
 - [ ] **Bloqueado por Meta, no por nosotros**: la app está "Sin publicar" y necesita pasar el **App Review** de Meta (2-4 semanas) para recibir eventos reales de personas que no sean testers — ver [`docs/setup-fase-2.md`](docs/setup-fase-2.md). Confirmado con una prueba real: un comentario desde otra cuenta no generó ningún evento, tal como advierte Meta.
-- [ ] Verificación del negocio en Business Manager (requisito para el App Review)
-- [ ] Política de privacidad publicada (requisito para el App Review)
-- [ ] Enviar la solicitud de App Review
+- [x] Política de privacidad e instrucciones de eliminación de datos publicadas (`privacidad.html`) y cargadas en la configuración de la app
+- [x] Solicitud de App Review creada (`submission_id 1114055364532957`), textos de "Uso permitido" y "Gestión de datos" completos
+- [ ] Verificación del negocio en Business Manager — **a cargo del usuario**, necesita datos legales reales
+- [ ] Grabar los 3 videos de demostración (uno por permiso) — **a cargo del usuario**, instrucciones exactas en `docs/setup-fase-2.md`
+- [ ] Cargar los videos y enviar la solicitud de App Review
 - [ ] Webhook de Facebook Messenger
 - [ ] Webhook de Meta Lead Ads
 - [ ] WhatsApp Business Cloud API conectado
