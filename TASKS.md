@@ -26,9 +26,16 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
       por el usuario ✅ **Fase 1 funcionando de punta a punta.**
 
 ## Fase 2 — Canales de Meta
-- [ ] Cuenta de Meta Business verificada
-- [ ] App de Meta for Developers creada
-- [ ] Webhook de Instagram (DM + comentarios con palabra clave)
+- [x] Business Manager con Página de Facebook e Instagram vinculados
+- [x] App de Meta for Developers creada (`Federada Inbound Engine`, App ID `1113996954538798`)
+- [x] Permisos de Instagram agregados (`instagram_business_basic`, `manage_comments`, `manage_messages`)
+- [x] Cuenta de Instagram agregada y aceptada como tester
+- [x] Webhook de Instagram (comentarios + DM, detección de palabra clave) — código escrito, 15 tests automáticos (firma HMAC + parseo de eventos), desplegado y **probado con un webhook simulado firmado de verdad**: guardó el lead y mandó la alerta de Telegram
+- [x] Webhook verificado y registrado en Meta (handshake ✓, campos `comments` y `messages` suscritos)
+- [ ] **Bloqueado por Meta, no por nosotros**: la app está "Sin publicar" y necesita pasar el **App Review** de Meta (2-4 semanas) para recibir eventos reales de personas que no sean testers — ver [`docs/setup-fase-2.md`](docs/setup-fase-2.md). Confirmado con una prueba real: un comentario desde otra cuenta no generó ningún evento, tal como advierte Meta.
+- [ ] Verificación del negocio en Business Manager (requisito para el App Review)
+- [ ] Política de privacidad publicada (requisito para el App Review)
+- [ ] Enviar la solicitud de App Review
 - [ ] Webhook de Facebook Messenger
 - [ ] Webhook de Meta Lead Ads
 - [ ] WhatsApp Business Cloud API conectado

@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { formatLeadAlert, sendTelegramAlert } from "./telegram.ts";
+import { formatInstagramAlert, formatLeadAlert, sendTelegramAlert } from "./telegram.ts";
 
 Deno.test("formatLeadAlert incluye los datos clave del lead", () => {
   const text = formatLeadAlert({
@@ -38,6 +38,57 @@ Deno.test("sendTelegramAlert usa el fetch inyectado y reporta éxito", async () 
   assertStringIncludes(calledUrl, "TOKEN123");
   assertEquals((calledBody as { chat_id: string }).chat_id, "CHAT456");
   assertEquals((calledBody as { text: string }).text, "hola lead");
+});
+
+Deno.test("formatLeadAlert escapa HTML en campos de texto libre", () => {
+  const text = formatLeadAlert({
+    name: "<script>alert(1)</script>",
+    locality: "Mendoza & alrededores",
+    phone: null,
+    score: 10,
+    source_channel: "landing",
+    employment_type: null,
+    intent_timeframe: null,
+  });
+  assertStringIncludes(text, "&lt;script&gt;");
+  assertStringIncludes(text, "Mendoza &amp; alrededores");
+});
+
+Deno.test("formatInstagramAlert incluye usuario, texto y marca la palabra clave", () => {
+  const text = formatInstagramAlert({
+    type: "comment",
+    username: "juanperez",
+    igUserId: "ig123",
+    text: "Quiero APORTES",
+    matchesKeyword: true,
+  });
+  assertStringIncludes(text, "@juanperez");
+  assertStringIncludes(text, "Quiero APORTES");
+  assertStringIncludes(text, "palabra clave");
+  assertStringIncludes(text, "Comentario nuevo");
+});
+
+Deno.test("formatInstagramAlert usa el id numerico si no hay username (DMs)", () => {
+  const text = formatInstagramAlert({
+    type: "message",
+    username: null,
+    igUserId: "17841400000",
+    text: "hola",
+    matchesKeyword: false,
+  });
+  assertStringIncludes(text, "usuario 17841400000");
+  assertStringIncludes(text, "Mensaje directo");
+});
+
+Deno.test("formatInstagramAlert escapa HTML en el texto del mensaje", () => {
+  const text = formatInstagramAlert({
+    type: "message",
+    username: null,
+    igUserId: "1",
+    text: "<b>hack</b>",
+    matchesKeyword: false,
+  });
+  assertStringIncludes(text, "&lt;b&gt;hack&lt;/b&gt;");
 });
 
 Deno.test("sendTelegramAlert reporta el error cuando Telegram responde mal", async () => {

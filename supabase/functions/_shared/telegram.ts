@@ -41,6 +41,16 @@ export async function sendTelegramAlert(
   }
 }
 
+// Telegram usa parse_mode HTML: cualquier texto que venga de un usuario
+// (nombre, comentario, mensaje) debe escaparse para que no rompa el
+// formato ni sea interpretado como una etiqueta.
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function formatLeadAlert(lead: {
   name: string | null;
   locality: string | null;
@@ -52,12 +62,30 @@ export function formatLeadAlert(lead: {
 }): string {
   const lines = [
     `🚨 <b>Lead CONTACTAR AHORA</b> (score ${lead.score})`,
-    `Nombre: ${lead.name ?? "sin dato"}`,
-    `Localidad: ${lead.locality ?? "sin dato"}`,
-    `Teléfono: ${lead.phone ?? "no dejó teléfono"}`,
+    `Nombre: ${lead.name ? escapeHtml(lead.name) : "sin dato"}`,
+    `Localidad: ${lead.locality ? escapeHtml(lead.locality) : "sin dato"}`,
+    `Teléfono: ${lead.phone ? escapeHtml(lead.phone) : "no dejó teléfono"}`,
     `Situación: ${lead.employment_type ?? "sin dato"}`,
     `Plazo: ${lead.intent_timeframe ?? "sin dato"}`,
     `Canal: ${lead.source_channel}`,
+  ];
+  return lines.join("\n");
+}
+
+export function formatInstagramAlert(event: {
+  type: "comment" | "message";
+  username: string | null;
+  igUserId: string;
+  text: string;
+  matchesKeyword: boolean;
+}): string {
+  const who = event.username ? `@${event.username}` : `usuario ${event.igUserId}`;
+  const kind = event.type === "comment" ? "Comentario" : "Mensaje directo";
+  const flag = event.matchesKeyword ? " 🔑 (con palabra clave)" : "";
+  const lines = [
+    `📸 <b>${kind} nuevo en Instagram</b>${flag}`,
+    `De: ${escapeHtml(who)}`,
+    `Texto: "${escapeHtml(event.text)}"`,
   ];
   return lines.join("\n");
 }
