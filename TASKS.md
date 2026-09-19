@@ -15,9 +15,9 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 - [x] Landing page con formulario (`landing/index.html`)
 - [x] Edge Function `intake-landing` (recibe el formulario, guarda el lead, calcula score)
 - [x] Helper de Telegram para notificaciones
-- [ ] Cuenta de Supabase creada por el usuario
-- [ ] Bot de Telegram creado por el usuario
-- [ ] Migración aplicada en el proyecto real de Supabase
+- [x] Cuenta de Supabase creada por el usuario
+- [x] Bot de Telegram creado por el usuario — probado, el mensaje de prueba llegó ✅
+- [x] Migración aplicada en el proyecto real de Supabase — verificado con curl contra las 4 tablas (200 OK) ✅
 - [ ] Edge Function desplegada en el proyecto real
 - [ ] Landing page publicada en GitHub Pages
 - [ ] **Prueba end-to-end real**: enviar el formulario de verdad y confirmar
