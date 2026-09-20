@@ -2,28 +2,18 @@
 
 Guía paso a paso para cuando te sientes a hacerlo. Sin decisiones que pensar.
 
-## 🟢 Descubrimiento importante antes de arrancar
+## ✅ Confirmado con una prueba real (20/09/2026) — ya no hace falta probarlo
 
-Para **publicar contenido e insights en TU PROPIA cuenta** (nunca en la de
-otra persona — que es exactamente nuestro caso), Meta tiene un modo
-llamado **"Standard Access"** que **funciona sin pasar por App Review**,
-siempre que tu cuenta ya tenga un rol en la app (la tuya ya lo tiene: es
-tester). Esto **no está confirmado en la práctica todavía** (hay que
-probarlo), pero si funciona como documenta Meta, te ahorra semanas de
-espera para el publicador y el analizador. Es 10 minutos de tu parte:
+Publicar contenido e insights en tu propia cuenta **funciona con Standard
+Access, sin App Review**. Se probó con un token real: se creó un
+contenedor de imagen (sin publicarlo) y se leyó insights reales de la
+cuenta. Ver el detalle en `docs/capacidades-meta.md`.
 
-### Paso rápido a probar (antes del checklist completo de abajo)
-1. Andá a [developers.facebook.com](https://developers.facebook.com) → tu
-   app **Federada Inbound Engine** → **Casos de uso** → "Administrar
-   mensajes y contenido en Instagram" → **Personalizar**.
-2. Agregá los permisos `instagram_business_content_publish` y
-   `instagram_business_manage_insights` (botón "Agregar", quedan en
-   estado "Listo para prueba" — es exactamente el mismo estado en el que
-   ya están tus otros 3 permisos hoy).
-3. Generá un token de acceso nuevo para tu cuenta @simoonhaddad (mismo
-   lugar de siempre) y pasámelo.
-4. Yo pruebo con ese token si publicar/leer insights en tu cuenta ya
-   funciona sin esperar el App Review. Si funciona, lo activamos ya.
+**Lo que falta ahora no es el permiso, es el token**: el que generás dura
+pocas horas, y el intercambio por uno de 60 días falla. Hasta resolver
+eso, publicar de forma automática y sostenida necesita que nos pases un
+token fresco cada tanto — infinitamente mejor que esperar semanas de App
+Review, pero todavía no 100% autónomo.
 
 Esto **NO reemplaza** el checklist de abajo — los permisos de comentarios
 y DMs (`manage_comments`, `manage_messages`) siguen necesitando el
@@ -56,9 +46,9 @@ nombre legal, dirección, teléfono, email, sitio web.
 `instagram_business_basic`, `instagram_business_manage_comments`,
 `instagram_business_manage_messages`, `public_profile`.
 
-*(Los de publicar/insights se prueban aparte, ver sección de arriba —
-si no funcionan en Standard Access, se agregan a esta misma solicitud
-antes de grabar los videos, para no hacer dos rondas.)*
+*(Los de publicar/insights ya NO hace falta pedirlos acá — se confirmó
+que Standard Access alcanza para la propia cuenta, ver sección de
+arriba.)*
 
 ### 5. Qué videos tenés que grabar
 Uno por cada permiso — 3 videos cortos, sin edición.
@@ -97,9 +87,6 @@ cuando alguien le comenta/escribe pidiendo información.
 2. Grabar los 3 videos.
 3. Cargar la URL de plataforma (paso 8).
 4. Subir los videos a cada sección y enviar la solicitud.
-5. (Opcional, 10 minutos) Probar el atajo de Standard Access de arriba
-   antes de grabar nada — si funciona, te ahorrás esperar el review para
-   publicar contenido.
 
 ## Mientras se espera
 

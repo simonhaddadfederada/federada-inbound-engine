@@ -87,8 +87,13 @@ Deno.serve(async (req) => {
         .update({ status: "publicado", published_ref: result.externalRef })
         .eq("id", piece.id);
       results.push({ slug: piece.slug, status: "publicado", detail: result.externalRef });
-    } else {
+    } else if (result.status === "blocked") {
       results.push({ slug: piece.slug, status: "blocked", detail: result.reason });
+    } else {
+      // "error": la llamada real a Meta falló (no es un bloqueo esperado,
+      // ej. token vencido, asset caído) — queda en su estado sin tocar,
+      // para reintentar en la próxima corrida del cron.
+      results.push({ slug: piece.slug, status: "error", detail: result.detail });
     }
   }
 
