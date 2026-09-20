@@ -38,6 +38,10 @@ export interface LandingFormPayload {
   campaign?: string;
   postRef?: string;
   threadId?: string; // opcional: id de sesión generado por el navegador
+  // Atribución: vienen de los parámetros ?content= y ?source= en la URL
+  // de la landing. contentSlug se resuelve contra content_pieces.slug.
+  contentSlug?: string;
+  originChannel?: string;
 }
 
 export interface LeadRow {
@@ -54,6 +58,8 @@ export interface LeadRow {
   intent_timeframe: IntentTimeframe | null;
   age_range: AgeRange | null;
   has_coverage: boolean | null;
+  content_piece_id: string | null;
+  origin_channel: string | null;
   phone: string | null;
   explicit_info_request: boolean;
   answers_completed: number;

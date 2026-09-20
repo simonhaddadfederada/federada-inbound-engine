@@ -223,6 +223,10 @@
     const params = new URLSearchParams(window.location.search);
     const campaign = params.get("utm_campaign") || undefined;
     const postRef = params.get("utm_content") || params.get("post") || undefined;
+    // Atribución silenciosa: si el link trae ?content=<slug>&source=<canal>,
+    // viaja con el formulario sin agregar ningún paso ni pregunta visible.
+    const contentSlug = params.get("content") || undefined;
+    const originChannel = params.get("source") || undefined;
 
     const answers = { ageRange: undefined, hasCoverage: undefined };
     let currentStep = 1;
@@ -289,6 +293,8 @@
         consent: true,
         campaign,
         postRef,
+        contentSlug,
+        originChannel,
       };
 
       try {

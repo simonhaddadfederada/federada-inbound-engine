@@ -58,17 +58,36 @@ const AGE_RANGE_LABELS: Record<string, string> = {
   "46_mas": "46 o más",
 };
 
-export function formatLeadAlert(lead: {
-  name: string | null;
-  locality: string | null;
-  phone: string | null;
-  score: number;
-  source_channel: string;
-  employment_type: string | null;
-  intent_timeframe: string | null;
-  age_range?: string | null;
-  has_coverage?: boolean | null;
-}): string {
+const CONTENT_FORMAT_LABELS: Record<string, string> = {
+  reel: "Reel",
+  carousel: "Carrusel",
+  story: "Historia",
+  post: "Publicación",
+};
+
+function capitalize(text: string): string {
+  return text.length ? text[0].toUpperCase() + text.slice(1) : text;
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+export function formatLeadAlert(
+  lead: {
+    name: string | null;
+    locality: string | null;
+    phone: string | null;
+    score: number;
+    source_channel: string;
+    employment_type: string | null;
+    intent_timeframe: string | null;
+    age_range?: string | null;
+    has_coverage?: boolean | null;
+    origin_channel?: string | null;
+  },
+  content?: { format: string; hook: string; keyword?: string | null } | null,
+): string {
   const lines = [
     `🚨 <b>Lead CONTACTAR AHORA</b> (score ${lead.score})`,
     `Nombre: ${lead.name ? escapeHtml(lead.name) : "sin dato"}`,
@@ -83,6 +102,12 @@ export function formatLeadAlert(lead: {
   if (lead.locality) lines.push(`Localidad: ${escapeHtml(lead.locality)}`);
   if (lead.employment_type) lines.push(`Situación: ${lead.employment_type}`);
   if (lead.intent_timeframe) lines.push(`Plazo: ${lead.intent_timeframe}`);
+  if (lead.origin_channel) lines.push(`Origen: ${escapeHtml(capitalize(lead.origin_channel))}`);
+  if (content) {
+    const formatLabel = CONTENT_FORMAT_LABELS[content.format] ?? capitalize(content.format);
+    lines.push(`Contenido: ${formatLabel} — "${escapeHtml(truncate(content.hook, 60))}"`);
+    if (content.keyword) lines.push(`CTA: ${escapeHtml(content.keyword)}`);
+  }
   lines.push(`Canal: ${lead.source_channel}`);
   return lines.join("\n");
 }

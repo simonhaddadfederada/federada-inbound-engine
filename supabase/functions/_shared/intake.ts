@@ -48,6 +48,8 @@ export function validateLandingPayload(
     campaign: nonEmpty(b.campaign) ? b.campaign.trim() : undefined,
     postRef: nonEmpty(b.postRef) ? b.postRef.trim() : undefined,
     threadId: nonEmpty(b.threadId) ? b.threadId.trim() : undefined,
+    contentSlug: nonEmpty(b.contentSlug) ? b.contentSlug.trim() : undefined,
+    originChannel: nonEmpty(b.originChannel) ? b.originChannel.trim() : undefined,
   };
 }
 

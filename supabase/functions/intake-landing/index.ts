@@ -61,6 +61,22 @@ Deno.serve(async (req) => {
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Si la persona llegó desde un link atribuible (?content=<slug>), resolvemos
+  // la pieza de contenido para guardar la atribución y enriquecer la alerta.
+  // Si el slug no existe (link viejo, typo) seguimos igual: nunca se bloquea
+  // la captura del lead por esto.
+  let contentPiece: { id: string; format: string; hook: string; keyword: string | null; channel: string } | null =
+    null;
+  if (payload.contentSlug) {
+    const { data } = await supabase
+      .from("content_pieces")
+      .select("id, format, hook, keyword, channel")
+      .eq("slug", payload.contentSlug)
+      .maybeSingle();
+    contentPiece = data ?? null;
+  }
+  const originChannel = payload.originChannel ?? contentPiece?.channel ?? null;
+
   // El teléfono es obligatorio en este flujo: es el identificador natural
   // para no duplicar al mismo aspirante si vuelve a mandar el formulario.
   const threadId = payload.threadId ?? payload.phone;
@@ -72,7 +88,9 @@ Deno.serve(async (req) => {
         source_channel: "landing",
         external_thread_id: threadId,
         campaign: payload.campaign ?? null,
-        post_ref: payload.postRef ?? null,
+        post_ref: payload.postRef ?? payload.contentSlug ?? null,
+        content_piece_id: contentPiece?.id ?? null,
+        origin_channel: originChannel,
         age_range: payload.ageRange ?? null,
         has_coverage: payload.hasCoverage ?? null,
         phone: payload.phone,
@@ -99,7 +117,12 @@ Deno.serve(async (req) => {
   if (band === "contactar_ahora") {
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
     const chatId = Deno.env.get("TELEGRAM_CHAT_ID") ?? "";
-    const text = formatLeadAlert(lead);
+    const text = formatLeadAlert(
+      lead,
+      contentPiece
+        ? { format: contentPiece.format, hook: contentPiece.hook, keyword: contentPiece.keyword }
+        : null,
+    );
     const result = await sendTelegramAlert(botToken, chatId, text);
     notification = { attempted: true, success: result.success, detail: result.detail };
 

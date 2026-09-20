@@ -49,6 +49,46 @@ Deno.test("formatLeadAlert no muestra lineas de datos que no vinieron", () => {
   assertEquals(text.includes("Localidad:"), false);
 });
 
+Deno.test("formatLeadAlert muestra origen y contenido cuando el lead viene de una pieza atribuida", () => {
+  const text = formatLeadAlert(
+    {
+      name: null,
+      locality: null,
+      phone: "261-555-0000",
+      score: 80,
+      source_channel: "landing",
+      employment_type: null,
+      intent_timeframe: null,
+      age_range: "26_35",
+      has_coverage: true,
+      origin_channel: "instagram",
+    },
+    {
+      format: "reel",
+      hook: "¿Sabías que una parte de tu sueldo YA la estás pagando para tu obra social, la uses o no?",
+      keyword: "APORTES",
+    },
+  );
+  assertStringIncludes(text, "Origen: Instagram");
+  assertStringIncludes(text, "Contenido: Reel —");
+  assertStringIncludes(text, "CTA: APORTES");
+});
+
+Deno.test("formatLeadAlert no muestra origen ni contenido cuando el lead no viene atribuido", () => {
+  const text = formatLeadAlert({
+    name: null,
+    locality: null,
+    phone: "261-555-0000",
+    score: 80,
+    source_channel: "landing",
+    employment_type: null,
+    intent_timeframe: null,
+  });
+  assertEquals(text.includes("Origen:"), false);
+  assertEquals(text.includes("Contenido:"), false);
+  assertEquals(text.includes("CTA:"), false);
+});
+
 Deno.test("sendTelegramAlert devuelve error claro si faltan credenciales", async () => {
   const result = await sendTelegramAlert("", "", "hola");
   assertEquals(result.success, false);

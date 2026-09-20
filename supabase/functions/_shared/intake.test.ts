@@ -75,6 +75,23 @@ Deno.test("cualquier envio valido de la landing minima llega a CONTACTAR AHORA",
   assertEquals(band, "contactar_ahora");
 });
 
+Deno.test("acepta y normaliza contentSlug/originChannel cuando vienen en la URL", () => {
+  const payload = validateLandingPayload({
+    phone: "261-555-0000",
+    consent: true,
+    contentSlug: "  reel-aportes-dependencia  ",
+    originChannel: "instagram",
+  });
+  assertEquals(payload.contentSlug, "reel-aportes-dependencia");
+  assertEquals(payload.originChannel, "instagram");
+});
+
+Deno.test("contentSlug/originChannel son opcionales", () => {
+  const payload = validateLandingPayload({ phone: "261-555-0000", consent: true });
+  assertEquals(payload.contentSlug, undefined);
+  assertEquals(payload.originChannel, undefined);
+});
+
 Deno.test("el score no cambia si el aspirante contesto ademas edad/cobertura", () => {
   const payload = validateLandingPayload({
     phone: "261-555-0000",
