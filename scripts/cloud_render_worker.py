@@ -32,6 +32,8 @@ from render_reel_asset import render_from_spec  # noqa: E402
 from render_post_asset import render_post, render_story  # noqa: E402
 from render_carousel_asset import render_slide  # noqa: E402
 from auto_beats import generate_beats_from_script  # noqa: E402
+from creative_director import decide_creative_direction, REEL_STYLES  # noqa: E402
+from quality_gate import score_piece  # noqa: E402
 
 MAX_ATTEMPTS = 3
 
@@ -238,13 +240,48 @@ def process_one(supabase_url, service_key, bot_token, chat_id):
         print("Falta render_spec — marcado render_failed (no se inventa un guion).")
         return True
 
+    # Bloque 18: Creative Director — decisión visual estructurada ANTES de
+    # renderizar, guardada junto a la pieza. Para Reels sin visual_style ya
+    # elegido a mano, se aplica automáticamente (mismo contenido/guion, solo
+    # cambia el tratamiento visual — nunca reescribe render_spec existente
+    # de otros formatos, donde el contenido ya está armado a mano para una
+    # función de layout específica).
+    creative_direction = decide_creative_direction(piece)
+    if fmt == "reel" and "visual_style" not in render_spec:
+        render_spec["visual_style"] = creative_direction["layout_style"]
+        rest_request(
+            "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
+            body={"render_spec": render_spec},
+        )
+    print(f"Creative direction: {creative_direction['layout_style']} ({creative_direction['emocion_principal']})")
+
     try:
         update_fields = renderer(piece_id, render_spec, supabase_url, service_key)
         print(f"Render ok: {update_fields}")
 
+        quality = score_piece(piece, creative_direction)
+        print(f"Quality gate: {quality['average']}/10 ({'ready' if quality['ready'] else 'bajo el umbral'})")
+        if not quality["ready"] and fmt == "reel":
+            # Recomponer: un solo reintento con un estilo visual distinto
+            # (nunca un loop sin límite) — se queda con lo que puntúe mejor.
+            alt_style = next((s for s in REEL_STYLES if s != render_spec.get("visual_style")), REEL_STYLES[0])
+            print(f"Bajo el umbral (7/10) — recomponiendo con visual_style={alt_style}...")
+            render_spec["visual_style"] = alt_style
+            update_fields = renderer(piece_id, render_spec, supabase_url, service_key)
+            creative_direction["layout_style"] = alt_style
+            quality = score_piece(piece, creative_direction)
+            print(f"Quality gate (recompuesto): {quality['average']}/10")
+            rest_request(
+                "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
+                body={"render_spec": render_spec},
+            )
+
         rest_request(
             "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
             body={
+                "creative_direction": creative_direction,
+                "quality_scores": quality["scores"],
+                "quality_score": quality["average"],
                 "status": "listo",
                 "render_attempts": 0,
                 "last_render_error": None,

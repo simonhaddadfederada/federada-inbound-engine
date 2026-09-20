@@ -154,6 +154,170 @@ def render_post(hook_lines, highlight_word, sub_text, cta_text, subcta_text, han
     return output_path
 
 
+def render_big_stat(stat_text, sub_text, cta_text, subcta_text, handle_text, output_path,
+                     canvas_size=None, bottom_safe=110, accent_glyph=None):
+    """Estilo 'dato/número protagonista' — el mismo lenguaje del slide
+    'stat' de carrusel, llevado a post/Story completos: un bloque magenta
+    grande domina el cuadro en vez del stack centrado de render_post.
+    accent_glyph (ej. '?'): watermark grande y tenue en una esquina, para
+    la variante 'pregunta directa' de Stories — mismo layout, otro énfasis."""
+    W, H = canvas_size or (globals()["W"], globals()["H"])
+    img = Image.new("RGB", (W, H), NAVY)
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / (H - 1)
+        r = round(NAVY[0] + (NAVY_DEEP[0] - NAVY[0]) * t)
+        g = round(NAVY[1] + (NAVY_DEEP[1] - NAVY[1]) * t)
+        b = round(NAVY[2] + (NAVY_DEEP[2] - NAVY[2]) * t)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
+    draw.rectangle([0, 0, 14, H], fill=MAGENTA)
+    max_w = W - 2 * MARGIN
+
+    if accent_glyph:
+        f_glyph = display_font(int(W * 0.6), "Black")
+        bbox = draw.textbbox((0, 0), accent_glyph, font=f_glyph)
+        gw = bbox[2] - bbox[0]
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        odraw = ImageDraw.Draw(overlay)
+        odraw.text((W - gw - bbox[0] - 20, H - int(W * 0.62)), accent_glyph, font=f_glyph, fill=(255, 255, 255, 20))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+    f_stat, stat_lines, _ = fit_font_multi(draw, stat_text, max_w, 160, min_size=72)
+    line_h = int(f_stat.size * 1.05)
+    block_pad = 60
+    block_h = line_h * len(stat_lines) + block_pad * 2
+
+    f_sub = text_font(38, "Medium")
+    sub_lines = wrap_text(draw, sub_text, f_sub, max_w) if sub_text else []
+    sub_line_h = 52
+
+    f_cta = display_font(48, "ExtraBold")
+    bbox_cta = draw.textbbox((0, 0), cta_text, font=f_cta)
+    cta_w, cta_h = bbox_cta[2] - bbox_cta[0], bbox_cta[3] - bbox_cta[1]
+    pad_x, pad_y = 56, 34
+    pill_w, pill_h = cta_w + pad_x * 2, cta_h + pad_y * 2
+
+    total_h = block_h + 50 + len(sub_lines) * sub_line_h + 50 + pill_h
+    y = max(bottom_safe, (H - bottom_safe - total_h) // 2)
+
+    draw.rounded_rectangle([MARGIN, y, W - MARGIN, y + block_h], radius=32, fill=MAGENTA)
+    ty = y + block_pad
+    for line in stat_lines:
+        bbox = draw.textbbox((0, 0), line, font=f_stat)
+        lw = bbox[2] - bbox[0]
+        draw.text((MARGIN + (max_w - lw) / 2, ty), line, font=f_stat, fill=WHITE)
+        ty += line_h
+    y += block_h + 50
+
+    for line in sub_lines:
+        bbox = draw.textbbox((0, 0), line, font=f_sub)
+        lw = bbox[2] - bbox[0]
+        draw.text((MARGIN + (max_w - lw) / 2, y), line, font=f_sub, fill=LIGHT_BLUE)
+        y += sub_line_h
+    y += 50
+
+    pill_x0 = MARGIN + (max_w - pill_w) / 2
+    draw.rounded_rectangle([pill_x0, y, pill_x0 + pill_w, y + pill_h], radius=pill_h // 2, fill=WHITE)
+    draw.text((pill_x0 + pad_x, y + pad_y - bbox_cta[1]), cta_text, font=f_cta, fill=NAVY)
+    if subcta_text:
+        f_subcta = text_font(32, "Medium")
+        sy = y + pill_h + 34
+        bbox = draw.textbbox((0, 0), subcta_text, font=f_subcta)
+        sw = bbox[2] - bbox[0]
+        draw.text((MARGIN + (max_w - sw) / 2, sy), subcta_text, font=f_subcta, fill=LIGHT_BLUE)
+
+    f_handle = text_font(26, "Regular")
+    hbbox = draw.textbbox((0, 0), handle_text, font=f_handle)
+    hw = hbbox[2] - hbbox[0]
+    draw.text(((W - hw) / 2, H - min(66, bottom_safe)), handle_text, font=f_handle, fill=WHITE)
+
+    img.save(output_path)
+    return output_path
+
+
+def render_editorial(eyebrow_text, headline_lines, body_text, cta_text, subcta_text, handle_text, output_path,
+                      canvas_size=None, bottom_safe=110):
+    """Estilo 'editorial/revista' — composición asimétrica a propósito,
+    para que no todo el feed se vea como el mismo stack centrado: eyebrow
+    arriba a la izquierda, título grande alineado a la izquierda, bloque
+    de acento en la esquina superior derecha, cuerpo corto, CTA abajo."""
+    W, H = canvas_size or (globals()["W"], globals()["H"])
+    img = Image.new("RGB", (W, H), NAVY)
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / (H - 1)
+        r = round(NAVY[0] + (NAVY_DEEP[0] - NAVY[0]) * t)
+        g = round(NAVY[1] + (NAVY_DEEP[1] - NAVY[1]) * t)
+        b = round(NAVY[2] + (NAVY_DEEP[2] - NAVY[2]) * t)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
+
+    corner = int(W * 0.32)
+    draw.polygon([(W - corner, 0), (W, 0), (W, corner)], fill=MAGENTA)
+    draw.rectangle([0, 0, 14, H], fill=MAGENTA)
+    max_w = W - 2 * MARGIN
+
+    f_eyebrow = text_font(30, "Bold")
+    y = bottom_safe
+    draw.text((MARGIN, y), eyebrow_text.upper(), font=f_eyebrow, fill=MAGENTA)
+    y += 56
+
+    f_headline, lines, size = fit_font_multi(draw, "\n".join(headline_lines), max_w, 84, min_size=52)
+    line_h = int(size * 1.12)
+    for raw_line in headline_lines:
+        for wrapped in wrap_text(draw, raw_line, f_headline, max_w):
+            draw.text((MARGIN, y), wrapped, font=f_headline, fill=WHITE)
+            y += line_h
+    y += 40
+
+    f_body = text_font(38, "Medium")
+    for line in wrap_text(draw, body_text, f_body, max_w):
+        draw.text((MARGIN, y), line, font=f_body, fill=LIGHT_BLUE)
+        y += 52
+    y += 40
+
+    f_cta = display_font(46, "ExtraBold")
+    bbox_cta = draw.textbbox((0, 0), cta_text, font=f_cta)
+    cta_w, cta_h = bbox_cta[2] - bbox_cta[0], bbox_cta[3] - bbox_cta[1]
+    pad_x, pad_y = 50, 30
+    pill_w, pill_h = cta_w + pad_x * 2, cta_h + pad_y * 2
+    draw.rounded_rectangle([MARGIN, y, MARGIN + pill_w, y + pill_h], radius=pill_h // 2, fill=MAGENTA)
+    draw.text((MARGIN + pad_x, y + pad_y - bbox_cta[1]), cta_text, font=f_cta, fill=WHITE)
+    y += pill_h + 30
+    if subcta_text:
+        f_subcta = text_font(32, "Medium")
+        draw.text((MARGIN, y), subcta_text, font=f_subcta, fill=LIGHT_BLUE)
+
+    f_handle = text_font(26, "Regular")
+    draw.text((MARGIN, H - min(66, bottom_safe)), handle_text, font=f_handle, fill=WHITE)
+
+    img.save(output_path)
+    return output_path
+
+
+def fit_font_multi(draw, text, max_width, start_size, weight="Black", min_size=48, step=4):
+    """Como wrap_text pero también ajusta el tamaño de fuente para que
+    entre en <=3 líneas — usado por los layouts 'protagonista' donde el
+    texto es corto pero debe verse grande."""
+    lines_in = text.split("\n") if "\n" in text else [text]
+    size = start_size
+    while size > min_size:
+        f = display_font(size, weight)
+        all_lines = []
+        for raw in lines_in:
+            all_lines.extend(wrap_text(draw, raw, f, max_width))
+        if len(all_lines) <= 3:
+            widest = max(draw.textbbox((0, 0), l, font=f)[2] for l in all_lines)
+            if widest <= max_width:
+                return f, all_lines, size
+        size -= step
+    f = display_font(min_size, weight)
+    all_lines = []
+    for raw in lines_in:
+        all_lines.extend(wrap_text(draw, raw, f, max_width))
+    return f, all_lines, min_size
+
+
 def render_story(hook_lines, highlight_word, sub_text, cta_text, subcta_text, handle_text, output_path):
     """Story real (1080x1920) — mismo lenguaje visual que el post, pero con
     más margen arriba/abajo para no quedar tapado por la hora/perfil o la

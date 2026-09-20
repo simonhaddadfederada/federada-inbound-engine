@@ -19,8 +19,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def render_slide(kind, index, total, title, body_lines, output_path, cta_text=None, subcta_text=None,
-                  handle_text=None):
-    """kind: 'cover' | 'content' | 'cta'"""
+                  handle_text=None, number=None):
+    """kind: 'cover' | 'content' | 'cta' | 'stat' | 'comparison' | 'listicle'.
+    number: solo para 'listicle' — el número que va en la insignia."""
     img = Image.new("RGB", (W, H), NAVY)
     draw = ImageDraw.Draw(img)
     for y in range(H):
@@ -81,6 +82,38 @@ def render_slide(kind, index, total, title, body_lines, output_path, cta_text=No
                 draw.text((MARGIN, y), line, font=f_body, fill=WHITE)
                 y += 56
             y += 24
+
+    elif kind == "listicle":
+        # Insignia numerada + título/cuerpo — para ideas tipo "3
+        # preguntas"/"5 cosas", donde el número ES el contenido.
+        badge_r = 46
+        badge_cy = 210
+        draw.ellipse(
+            [MARGIN, badge_cy - badge_r, MARGIN + badge_r * 2, badge_cy + badge_r], fill=MAGENTA,
+        )
+        f_num = display_font(50, "Black")
+        num_text = str(number or index)
+        nbbox = draw.textbbox((0, 0), num_text, font=f_num)
+        nw, nh = nbbox[2] - nbbox[0], nbbox[3] - nbbox[1]
+        draw.text(
+            (MARGIN + badge_r - nw / 2 - nbbox[0], badge_cy - nh / 2 - nbbox[1]),
+            num_text, font=f_num, fill=WHITE,
+        )
+        text_x = MARGIN + badge_r * 2 + 30
+        text_max_w = W - MARGIN - text_x
+        f_title = display_font(48, "ExtraBold")
+        title_lines = wrap_text(draw, title, f_title, text_max_w)
+        y = badge_cy - (len(title_lines) * 56) / 2
+        for line in title_lines:
+            draw.text((text_x, y), line, font=f_title, fill=WHITE)
+            y += 56
+        y = badge_cy + badge_r + 50
+        f_body = text_font(38, "Medium")
+        for para in body_lines:
+            for line in wrap_text(draw, para, f_body, max_w):
+                draw.text((MARGIN, y), line, font=f_body, fill=LIGHT_BLUE)
+                y += 52
+            y += 20
 
     elif kind == "cta":
         f_title = display_font(64, "Black")

@@ -251,7 +251,7 @@ def glow_blob(cx, cy, radius, color, alpha=70):
     return _glow_cache[key]
 
 
-def build_background(progress, beat_index):
+def _navy_gradient_canvas():
     canvas = Image.new("RGB", (BG_W, BG_H), NAVY)
     draw = ImageDraw.Draw(canvas)
     for y in range(BG_H):
@@ -260,8 +260,14 @@ def build_background(progress, beat_index):
         g = round(NAVY[1] + (NAVY_DEEP[1] - NAVY[1]) * t)
         b = round(NAVY[2] + (NAVY_DEEP[2] - NAVY[2]) * t)
         draw.line([(0, y), (BG_W, y)], fill=(r, g, b))
-    draw.rectangle([0, 0, 18, BG_H], fill=MAGENTA)
+    return canvas, draw
 
+
+def _canvas_glow_orbital(beat_index):
+    """Estilo original: acento circular con blur que orbita entre 5
+    posiciones por beat — cálido, orgánico. Bueno para dinero/curiosidad."""
+    canvas, draw = _navy_gradient_canvas()
+    draw.rectangle([0, 0, 18, BG_H], fill=MAGENTA)
     corners = [
         (BG_W * 0.12, BG_H * 0.18), (BG_W * 0.88, BG_H * 0.28),
         (BG_W * 0.15, BG_H * 0.75), (BG_W * 0.85, BG_H * 0.8),
@@ -269,9 +275,77 @@ def build_background(progress, beat_index):
     ]
     cx, cy = corners[beat_index % len(corners)]
     canvas = canvas.convert("RGBA")
-    blob, bx, by = glow_blob(0, 0, 420, MAGENTA, alpha=55)
+    blob, _, _ = glow_blob(0, 0, 420, MAGENTA, alpha=55)
     canvas.alpha_composite(blob, (int(cx - 420), int(cy - 420)))
+    return canvas.convert("RGB")
+
+
+def _canvas_split_diagonal(beat_index):
+    """Estilo tenso/dramático: un bloque diagonal magenta que alterna de
+    esquina cada beat — bueno para hooks de miedo/objeción."""
+    canvas, draw = _navy_gradient_canvas()
+    from_right = beat_index % 2 == 0
+    span = BG_W * 0.42
+    if from_right:
+        draw.polygon([(BG_W, 0), (BG_W, BG_H * 0.55), (BG_W - span, 0)], fill=MAGENTA)
+    else:
+        draw.polygon([(0, BG_H), (0, BG_H * 0.45), (span, BG_H)], fill=MAGENTA)
+    draw.rectangle([0, 0, 18, BG_H], fill=MAGENTA)
+    return canvas
+
+
+def _canvas_grid_pulse(beat_index):
+    """Estilo 'dato/información': grilla tenue de fondo + un acento
+    circular chico que pulsa de posición — bueno para educativo/FAQ."""
+    canvas, draw = _navy_gradient_canvas()
+    step = 90
+    grid_color = (255, 255, 255, 14)
+    canvas = canvas.convert("RGBA")
+    overlay = Image.new("RGBA", (BG_W, BG_H), (0, 0, 0, 0))
+    odraw = ImageDraw.Draw(overlay)
+    for gx in range(0, BG_W, step):
+        odraw.line([(gx, 0), (gx, BG_H)], fill=grid_color, width=1)
+    for gy in range(0, BG_H, step):
+        odraw.line([(0, gy), (BG_W, gy)], fill=grid_color, width=1)
+    canvas.alpha_composite(overlay)
+    positions = [(BG_W * 0.2, BG_H * 0.25), (BG_W * 0.8, BG_H * 0.7), (BG_W * 0.5, BG_H * 0.5)]
+    cx, cy = positions[beat_index % len(positions)]
+    blob, _, _ = glow_blob(0, 0, 240, MAGENTA, alpha=70)
+    canvas.alpha_composite(blob, (int(cx - 240), int(cy - 240)))
     canvas = canvas.convert("RGB")
+    ImageDraw.Draw(canvas).rectangle([0, 0, 18, BG_H], fill=MAGENTA)
+    return canvas
+
+
+def _canvas_big_shape_focus(beat_index):
+    """Estilo declaración fuerte: una sola forma redondeada grande,
+    descentrada, domina el cuadro — bueno para mitos/afirmaciones tajantes."""
+    canvas, draw = _navy_gradient_canvas()
+    positions = [(BG_W * 0.75, BG_H * 0.3), (BG_W * 0.25, BG_H * 0.65), (BG_W * 0.7, BG_H * 0.75)]
+    cx, cy = positions[beat_index % len(positions)]
+    radius = int(BG_W * 0.34)
+    canvas = canvas.convert("RGBA")
+    overlay = Image.new("RGBA", (BG_W, BG_H), (0, 0, 0, 0))
+    ImageDraw.Draw(overlay).ellipse(
+        [cx - radius, cy - radius, cx + radius, cy + radius], fill=MAGENTA + (36,),
+    )
+    canvas.alpha_composite(overlay)
+    canvas = canvas.convert("RGB")
+    ImageDraw.Draw(canvas).rectangle([0, 0, 18, BG_H], fill=MAGENTA)
+    return canvas
+
+
+REEL_STYLES = {
+    "glow_orbital": _canvas_glow_orbital,
+    "split_diagonal": _canvas_split_diagonal,
+    "grid_pulse": _canvas_grid_pulse,
+    "big_shape_focus": _canvas_big_shape_focus,
+}
+
+
+def build_background(progress, beat_index, style="glow_orbital"):
+    builder = REEL_STYLES.get(style, _canvas_glow_orbital)
+    canvas = builder(beat_index)
 
     zoom = 1.0 + 0.16 * progress
     zw, zh = int(W * zoom), int(H * zoom)
@@ -379,7 +453,7 @@ def mix_voice_and_music(voice_path: str, music_path: str, total_duration: float,
 
 
 def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_preset=MELANIE_ENERGICA,
-                 music_prompt=None):
+                 music_prompt=None, visual_style="glow_orbital"):
     # 1) Sintetizar el guion completo y repartir timing real por beat.
     full_script = build_tts_script(beats)
     tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
@@ -411,7 +485,7 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_pr
             local_t = t_global - starts[beat_idx]
             local_anim = ease_out_back(min(local_t / 0.3, 1.0)) if local_t < 0.3 else 1.0
 
-            frame = build_background(progress, beat_idx).convert("RGBA")
+            frame = build_background(progress, beat_idx, style=visual_style).convert("RGBA")
             overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             odraw = ImageDraw.Draw(overlay)
 
@@ -564,6 +638,7 @@ def render_from_spec(spec: dict, output_path: str):
         output_path=output_path,
         voice_preset=MELANIE_ENERGICA,
         music_prompt=spec.get("music_prompt"),
+        visual_style=spec.get("visual_style", "glow_orbital"),
     )
 
 
