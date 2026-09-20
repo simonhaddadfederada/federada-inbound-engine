@@ -76,14 +76,19 @@ def count_real_words(text: str) -> int:
 
 
 def _load_env():
-    env = {}
-    with open(os.path.join(REPO_ROOT, ".env")) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            env[k] = v
+    """En GitHub Actions (o cualquier entorno cloud) los secrets ya vienen
+    como variables de entorno reales — no hay ningún .env que leer. Local,
+    seguimos leyendo .env como siempre. os.environ tiene prioridad."""
+    env = dict(os.environ)
+    env_path = os.path.join(REPO_ROOT, ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                env.setdefault(k, v)
     return env
 
 
@@ -533,9 +538,42 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_pr
     return output_path, total_duration
 
 
+def render_from_spec(spec: dict, output_path: str):
+    """Igual que llamar a render_reel a mano, pero a partir de un dict
+    (típicamente content_pieces.render_spec) — así el worker de GitHub
+    Actions puede renderizar cualquier pieza sin tener el guion
+    hardcodeado en este archivo. voice_preset siempre es MELANIE_ENERGICA
+    (preset único definitivo, no configurable por spec)."""
+    return render_reel(
+        spec["beats"],
+        cta_text=spec["cta_text"],
+        subcta_text=spec.get("subcta_text"),
+        handle_text=spec.get("handle_text", "@simoonhaddad · Asesor Federada Salud"),
+        output_path=output_path,
+        voice_preset=MELANIE_ENERGICA,
+        music_prompt=spec.get("music_prompt"),
+    )
+
+
 if __name__ == "__main__":
-    # Mismo guion/contenido que la version anterior — solo se agrega la
-    # direccion de voz (audio tags) del preset ENERGICA elegido por Simon.
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Reel Engine V3.1")
+    parser.add_argument("--spec", help="Ruta a un JSON con beats/cta_text/subcta_text/handle_text/music_prompt")
+    parser.add_argument("--out", help="Ruta de salida del MP4 (default: assets/generated/<algo>.mp4)")
+    args = parser.parse_args()
+
+    if args.spec:
+        with open(args.spec) as f:
+            spec = json.load(f)
+        out_path = args.out or os.path.join(REPO_ROOT, "assets", "generated", "reel-desde-spec.mp4")
+        out, dur = render_from_spec(spec, out_path)
+        print("listo", out, f"{dur:.1f}s")
+        raise SystemExit(0)
+
+    # Sin --spec: demo hardcodeada de siempre (mismo guion que la version
+    # anterior — solo se agrega la direccion de voz / audio tags del
+    # preset ENERGICA elegido por Simon).
     beats = [
         {"type": "question", "text": "¿SOS MONOTRIBUTISTA Y NO SABÉS EN QUÉ CATEGORÍA ESTÁS?",
          "spoken": "[curious] ¿Sos monotributista y no sabés en qué categoría estás?",
