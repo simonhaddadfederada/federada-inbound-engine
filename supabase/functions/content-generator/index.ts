@@ -302,6 +302,15 @@ Reglas de CTA por formato (importante, no las mezcles):
 
 "theme" tiene que ser snake_case simple, sin tildes ni espacios (se usa en una URL).
 
+"script" es la CAPTION REAL que se publica en Instagram — NO una nota de producción ni una
+descripción de lo que hay que grabar/diseñar. Escribilo en primera persona, tal cual lo leería
+alguien en el feed, terminando con el CTA. Mal (nota de producción, no usar):
+"Contar un caso típico de alguien que elige por precio y después...". Bien (caption real):
+"Elegís la opción más barata, y el día que la necesitás de verdad te enterás de que el prestador
+que más usás no está en tu cartilla.\n\nPor eso conviene mirarla ANTES de decidir, no después.\n\nEscribime CARTILLA y te ayudo a revisarla." — bug real encontrado el 20/09/2026: sin esta aclaración,
+"script" salía como nota de producción y quedaba impublicable tal cual.
+Para "carousel": "script" es la caption del carrusel completo (no la lista de qué va en cada slide).
+
 Devolvé SOLO un array JSON (sin texto alrededor, SIN bloque de código markdown \`\`\`, arrancando directo con "[") de objetos con esta forma exacta:
 [{"format":"reel|carousel|story|post","theme":"tema_en_snake_case","hook_type":"dinero|miedo|curiosidad|educativo|faq|mito","hook":"...","script":"...","cta":"...","keyword":"PALABRA o null","audience":"...","hypothesis":"..."}]`;
 }
