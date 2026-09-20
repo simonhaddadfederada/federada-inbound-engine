@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
 
   const { data: config, error: configError } = await supabase
     .from("content_config")
-    .select("auto_publish")
+    .select("auto_publish, consecutive_publish_failures")
     .eq("id", 1)
     .single();
   if (configError || !config) {
@@ -214,10 +214,55 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Failsafe (Bloque 16, modo autónomo): 3 publicaciones consecutivas
+  // fallidas apagan auto_publish solas y avisan por Telegram — nunca
+  // sigue intentando publicar sin límite. El contador se persiste en
+  // content_config porque cada corrida del cron es una invocación nueva.
+  const FAILSAFE_THRESHOLD = 3;
+  let consecutiveFailures = config.consecutive_publish_failures ?? 0;
   const results: { slug: string; status: string; detail: string }[] = [];
+  let autoPublishDisabled = false;
+
   for (const piece of due) {
-    results.push(await publishAndPersist(supabase, piece, getCredentials, botToken, chatId));
+    const outcome = await publishAndPersist(supabase, piece, getCredentials, botToken, chatId);
+    results.push(outcome);
+
+    if (outcome.status === "publicado") {
+      consecutiveFailures = 0;
+    } else if (outcome.status === "error") {
+      consecutiveFailures += 1;
+    }
+    // "blocked" no cuenta como fallo del publicador (falta un asset o
+    // token, no un error real de Meta) — no mueve el contador.
+
+    if (consecutiveFailures >= FAILSAFE_THRESHOLD) {
+      await supabase
+        .from("content_config")
+        .update({ auto_publish: false, consecutive_publish_failures: consecutiveFailures })
+        .eq("id", 1);
+      await sendTelegramAlert(
+        botToken,
+        chatId,
+        `🛑 <b>AUTO_PUBLISH desactivado automáticamente</b>\n${consecutiveFailures} publicaciones consecutivas fallaron. ` +
+          `Última: "${piece.slug}" — ${outcome.detail}\nRevisá el error antes de reactivarlo a mano.`,
+      );
+      autoPublishDisabled = true;
+      break;
+    }
   }
 
-  return jsonResponse({ ok: true, action: "processed", autoPublish: true, results });
+  if (!autoPublishDisabled) {
+    await supabase
+      .from("content_config")
+      .update({ consecutive_publish_failures: consecutiveFailures })
+      .eq("id", 1);
+  }
+
+  return jsonResponse({
+    ok: true,
+    action: "processed",
+    autoPublish: !autoPublishDisabled,
+    autoPublishDisabledByFailsafe: autoPublishDisabled,
+    results,
+  });
 });
