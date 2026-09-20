@@ -53,19 +53,38 @@ archivo versionado. **Probado en vivo de verdad**: se disparó manualmente
 el mismo `net.http_post` que usa el cron y se confirmó la respuesta real
 guardada por Postgres (200, `{"ok":true,"action":"waiting_approval",...}`).
 
-## Lo que falta para que esto genere/analice contenido solo (y quién lo decide)
+## ANTHROPIC_API_KEY — activado y verificado (20/09/2026)
 
-1. **ANTHROPIC_API_KEY + confirmar `ai_daily_budget_usd`** (hoy en USD 2.00
-   por día como default conservador) — necesita que Simón decida si quiere
-   pagar esto y cuánto. Sin esto, `content-generator`/`content-analyzer`
-   siguen "bloqueados" de forma segura aunque el cron ya los llame todos
-   los días (se puede confirmar mirando los logs de la función en
-   Supabase, o el resultado en `net._http_response`).
-2. **Permiso `instagram_business_content_publish` + App Review aprobado**
+Cuenta creada por Simón, USD 5 de crédito, recarga automática apagada a
+propósito. Key guardada como secret de Supabase (nunca en git). Antes de
+usarla de verdad se probó, en este orden:
+
+1. **Enforcement del presupuesto con la key YA configurada**: se insertó
+   un gasto simulado de USD 2.00 (el límite exacto) en `ai_usage_log` y
+   se llamó a `content-generator` real — respondió `blocked` sin llegar a
+   tocar la API de Anthropic. Se borró el gasto simulado.
+2. **Generación real de prueba**: se detectó y corrigió un bug real en el
+   camino (Claude devolvía el JSON envuelto en \`\`\`json, y el parser no
+   lo esperaba — se agregó `slugify()` para los slugs, que además traían
+   tildes/espacios sin sanitizar, y se reforzó el prompt para que el CTA y
+   el `keyword` de cada pieza sean siempre consistentes entre sí). Tras el
+   fix, 3 corridas reales, 11 piezas generadas, 0 rechazadas por las
+   reglas de variedad. Costo real total: **USD 0.0276** (modelo
+   `claude-haiku-4-5-20251001`, ~17-19 segundos por corrida).
+3. Cola actual: **30 piezas**, cubriendo **8 días** (por encima del
+   mínimo de 7).
+
+El cron diario (`content-generator-daily`, 06:00 Mendoza, activado en el
+Bloque 5) ya va a generar solo, de verdad, la próxima vez que la cola baje
+de 7 días — no hace falta ninguna acción extra para "activarlo".
+
+## Lo que falta para publicar de verdad (y quién lo decide)
+
+1. **Permiso `instagram_business_content_publish` + App Review aprobado**
    (o, más rápido: probar si Standard Access ya alcanza para publicar en
    la propia cuenta — ver `docs/checklist-app-review.md`) para que
    `publish-content` deje de estar bloqueado en los 4 formatos.
-3. Cuando 1-2 estén resueltos, cambiar `content_config.auto_publish` a
+2. Cuando eso esté resuelto, cambiar `content_config.auto_publish` a
    `true` es la única acción necesaria para habilitar la publicación
    automática — y solo publicará lo que ya esté en estado `programado`.
 

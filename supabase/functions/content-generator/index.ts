@@ -58,6 +58,17 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// El slug se usa en la URL de la landing (?content=<slug>) — tiene que ser
+// ASCII simple, sin tildes ni espacios, o el link queda frágil.
+function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function todayIsoMendoza(): string {
   // Mendoza es UTC-3 fijo: restamos 3hs a "ahora UTC" para obtener la fecha local.
   const d = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -189,11 +200,15 @@ Deno.serve(async (req) => {
   });
 
   const textBlock = anthropicJson.content?.find((c: { type: string }) => c.type === "text");
+  // Claude a veces envuelve el JSON en un bloque ```json ... ``` aunque se le
+  // pida "solo JSON" — se lo sacamos antes de parsear en vez de asumir texto plano.
+  const rawText = (textBlock?.text ?? "[]").trim();
+  const unfenced = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
   let candidates: GeneratedPieceCandidate[] = [];
   try {
-    candidates = JSON.parse(textBlock?.text ?? "[]");
+    candidates = JSON.parse(unfenced);
   } catch {
-    return jsonResponse({ error: "La respuesta de Claude no fue JSON válido", raw: textBlock?.text }, 502);
+    return jsonResponse({ error: "La respuesta de Claude no fue JSON válido", raw: rawText }, 502);
   }
 
   const inserted: string[] = [];
@@ -215,7 +230,7 @@ Deno.serve(async (req) => {
     const slotIndex = dayCounters[`${dateIso}:${candidate.format}`] ?? 0;
     dayCounters[`${dateIso}:${candidate.format}`] = slotIndex + 1;
     const scheduledAt = scheduledAtFor(dateIso, candidate.format, slotIndex, config.slot_times);
-    const slug = `${candidate.format}-${candidate.theme}-${crypto.randomUUID().slice(0, 8)}`;
+    const slug = `${slugify(candidate.format)}-${slugify(candidate.theme)}-${crypto.randomUUID().slice(0, 8)}`;
 
     const { error: insertError } = await supabase.from("content_pieces").insert({
       slug,
@@ -270,7 +285,19 @@ Necesito cubrir ${daysNeeded} día(s) más de contenido con esta cadencia diaria
 - ${config.carousels_per_week} carrusel(es) por semana
 - ${config.posts_per_week} post(s) por semana
 
-Devolvé SOLO un array JSON (sin texto alrededor) de objetos con esta forma exacta:
+Reglas de CTA por formato (importante, no las mezcles):
+- "story": el CTA SIEMPRE tiene que invitar a deslizar/tocar el link de la
+  historia (ej: "Deslizá el link de esta historia..."), NUNCA pedir que
+  escriban una palabra por DM — el campo "keyword" va en null.
+- "reel"/"carousel"/"post": Instagram no permite links en el texto, así que
+  el CTA pide una palabra clave por DM o comentario (ej: "Escribime PLAN",
+  "Comentá CARTILLA"). El campo "keyword" tiene que ser EXACTAMENTE esa
+  palabra, en MAYÚSCULAS y sin tildes, igual a como aparece en el texto
+  del CTA — nunca una palabra distinta ni en minúsculas.
+
+"theme" tiene que ser snake_case simple, sin tildes ni espacios (se usa en una URL).
+
+Devolvé SOLO un array JSON (sin texto alrededor, SIN bloque de código markdown \`\`\`, arrancando directo con "[") de objetos con esta forma exacta:
 [{"format":"reel|carousel|story|post","theme":"tema_en_snake_case","hook_type":"dinero|miedo|curiosidad|educativo|faq|mito","hook":"...","script":"...","cta":"...","keyword":"PALABRA o null","audience":"...","hypothesis":"..."}]`;
 }
 
