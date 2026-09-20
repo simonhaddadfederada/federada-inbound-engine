@@ -87,6 +87,7 @@ export function formatLeadAlert(
     origin_channel?: string | null;
   },
   content?: { format: string; hook: string; keyword?: string | null } | null,
+  adRef?: string | null,
 ): string {
   const lines = [
     `🚨 <b>Lead CONTACTAR AHORA</b> (score ${lead.score})`,
@@ -108,6 +109,7 @@ export function formatLeadAlert(
     lines.push(`Contenido: ${formatLabel} — "${escapeHtml(truncate(content.hook, 60))}"`);
     if (content.keyword) lines.push(`CTA: ${escapeHtml(content.keyword)}`);
   }
+  if (adRef) lines.push(`Anuncio: ${escapeHtml(adRef)}`);
   lines.push(`Canal: ${lead.source_channel}`);
   return lines.join("\n");
 }

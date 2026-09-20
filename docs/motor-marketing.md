@@ -34,21 +34,38 @@ como `intake-landing` — nadie con la clave anon puede dispararlas.
   adapter de Meta, solo informa cuáles están esperando aprobación.
   **Probado en vivo**: devolvió `waiting_approval` sin publicar nada.
 
-## Lo que falta para que esto corra solo (y quién lo decide)
+## Automatización 24/7 — YA ACTIVA (Bloque 5)
+
+Se verificó (no se asumió) que `pg_cron` y `pg_net` están disponibles en
+el plan actual — son extensiones de Postgres, no una feature paga aparte
+(`0009_cron_extensions.sql`). Se activaron 3 jobs corriendo en la nube,
+sin depender de que la computadora de Simón esté prendida:
+
+| Job | Frecuencia | Hora Mendoza |
+|---|---|---|
+| `content-generator-daily` | 1 vez por día | 06:00 |
+| `content-analyzer-daily` | 1 vez por día | 07:00 |
+| `publish-content-every-30-min` | cada 30 min | — |
+
+El secreto interno (`INTERNAL_FUNCTIONS_SECRET`) se guarda en Supabase
+Vault y el cron lo lee de ahí — nunca quedó en texto plano en ningún
+archivo versionado. **Probado en vivo de verdad**: se disparó manualmente
+el mismo `net.http_post` que usa el cron y se confirmó la respuesta real
+guardada por Postgres (200, `{"ok":true,"action":"waiting_approval",...}`).
+
+## Lo que falta para que esto genere/analice contenido solo (y quién lo decide)
 
 1. **ANTHROPIC_API_KEY + confirmar `ai_daily_budget_usd`** (hoy en USD 2.00
    por día como default conservador) — necesita que Simón decida si quiere
    pagar esto y cuánto. Sin esto, `content-generator`/`content-analyzer`
-   siguen "bloqueados" de forma segura, tal como están probados hoy.
-2. **Cron real** que llame a `content-generator` (ej. una vez por día) y a
-   `content-analyzer` (ej. una vez por semana). Supabase tiene una función
-   de Cron nativa, pero activarla depende del plan del proyecto — no se
-   activó todavía porque implica una decisión de Simón, no una decisión
-   técnica trivial.
-3. **Permiso `instagram_business_content_publish` + App Review aprobado**
-   para que `publish-content` deje de estar bloqueado en los 4 formatos
-   (ver `docs/capacidades-meta.md`).
-4. Cuando 1-3 estén resueltos, cambiar `content_config.auto_publish` a
+   siguen "bloqueados" de forma segura aunque el cron ya los llame todos
+   los días (se puede confirmar mirando los logs de la función en
+   Supabase, o el resultado en `net._http_response`).
+2. **Permiso `instagram_business_content_publish` + App Review aprobado**
+   (o, más rápido: probar si Standard Access ya alcanza para publicar en
+   la propia cuenta — ver `docs/checklist-app-review.md`) para que
+   `publish-content` deje de estar bloqueado en los 4 formatos.
+3. Cuando 1-2 estén resueltos, cambiar `content_config.auto_publish` a
    `true` es la única acción necesaria para habilitar la publicación
    automática — y solo publicará lo que ya esté en estado `programado`.
 

@@ -89,6 +89,37 @@ Deno.test("formatLeadAlert no muestra origen ni contenido cuando el lead no vien
   assertEquals(text.includes("CTA:"), false);
 });
 
+Deno.test("formatLeadAlert muestra la referencia del anuncio cuando viene de Meta Ads", () => {
+  const text = formatLeadAlert(
+    {
+      name: null,
+      locality: null,
+      phone: "261-555-0000",
+      score: 80,
+      source_channel: "meta_ads",
+      employment_type: null,
+      intent_timeframe: null,
+      origin_channel: "meta_ads",
+    },
+    null,
+    "Campaña camp1 / Anuncio ad1",
+  );
+  assertStringIncludes(text, "Anuncio: Campaña camp1 / Anuncio ad1");
+});
+
+Deno.test("formatLeadAlert no muestra linea de anuncio si no se pasa adRef", () => {
+  const text = formatLeadAlert({
+    name: null,
+    locality: null,
+    phone: "261-555-0000",
+    score: 80,
+    source_channel: "landing",
+    employment_type: null,
+    intent_timeframe: null,
+  });
+  assertEquals(text.includes("Anuncio:"), false);
+});
+
 Deno.test("sendTelegramAlert devuelve error claro si faltan credenciales", async () => {
   const result = await sendTelegramAlert("", "", "hola");
   assertEquals(result.success, false);
