@@ -75,17 +75,23 @@ def count_real_words(text: str) -> int:
     return len([w for w in text.split() if not TAG_ONLY.fullmatch(w)])
 
 
+def _sanitize_secret(v: str) -> str:
+    """Un secret cargado a mano puede traer basura de más — encontrado de
+    verdad el 20/09/2026 con SUPABASE_URL en GitHub Actions: ni siquiera
+    .strip() alcanzaba (la basura no estaba en el borde, sino a mitad de
+    cadena — un salto de línea seguido de más texto pegado por error).
+    Ninguno de nuestros secrets es legítimamente multi-línea ni con
+    espacios adentro, así que quedarse con el primer bloque sin
+    espacios/control-chars es siempre seguro."""
+    m = re.match(r"\S*", v.strip())
+    return m.group() if m else v.strip()
+
+
 def _load_env():
     """En GitHub Actions (o cualquier entorno cloud) los secrets ya vienen
     como variables de entorno reales — no hay ningún .env que leer. Local,
-    seguimos leyendo .env como siempre. os.environ tiene prioridad.
-
-    .strip() en los valores: un secret cargado a mano a veces trae un
-    salto de línea de sobra al final (copiando la línea completa desde
-    una terminal) — encontrado de verdad el 20/09/2026 con SUPABASE_URL
-    en GitHub Actions, rompía urllib con "URL can't contain control
-    characters"."""
-    env = {k: v.strip() for k, v in os.environ.items()}
+    seguimos leyendo .env como siempre. os.environ tiene prioridad."""
+    env = {k: _sanitize_secret(v) for k, v in os.environ.items()}
     env_path = os.path.join(REPO_ROOT, ".env")
     if os.path.exists(env_path):
         with open(env_path) as f:

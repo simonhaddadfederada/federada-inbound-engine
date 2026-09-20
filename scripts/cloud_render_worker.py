@@ -20,6 +20,7 @@ PATCH.
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -33,13 +34,18 @@ MAX_ATTEMPTS = 3
 
 
 def env(name, required=True):
-    # .strip(): un secret cargado a mano en GitHub a veces trae un salto de
-    # línea de sobra al final (copiando la línea completa desde una
-    # terminal) — encontrado de verdad el 20/09/2026 con SUPABASE_URL,
-    # que rompía urllib con "URL can't contain control characters".
+    # Un secret cargado a mano en GitHub puede traer basura de más —
+    # encontrado de verdad el 20/09/2026 con SUPABASE_URL: ni siquiera
+    # .strip() alcanzó (el error seguía después de aplicarlo), lo que
+    # confirma que la basura no estaba en el borde sino a mitad de
+    # cadena (por ejemplo, un salto de línea seguido de más texto
+    # pegado por error). Ninguno de nuestros secrets es legítimamente
+    # multi-línea o con espacios adentro, así que quedarse con el
+    # primer bloque sin espacios/control-chars es siempre seguro.
     v = os.environ.get(name)
     if v is not None:
-        v = v.strip()
+        m = re.match(r"\S*", v.strip())
+        v = m.group() if m else v.strip()
     if required and not v:
         raise RuntimeError(f"Falta la variable de entorno {name}")
     return v
