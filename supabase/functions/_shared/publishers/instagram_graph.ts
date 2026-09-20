@@ -68,3 +68,31 @@ export async function publishContainer(
     fetchImpl,
   );
 }
+
+export type RefreshResult =
+  | { ok: true; accessToken: string; expiresInSeconds: number }
+  | { ok: false; error: string };
+
+// El token que emite el panel de Meta para "Instagram API with Instagram
+// Login" ya es de larga duración (60 días) — este es el endpoint correcto
+// para renovarlo (grant_type=ig_refresh_token), NO el de intercambio
+// (ig_exchange_token, que es para tokens cortos y devuelve "Session key
+// invalid" si se lo usa sobre uno que ya es largo — así se detectó el bug).
+export async function refreshLongLivedToken(
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RefreshResult> {
+  try {
+    const url = `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${
+      encodeURIComponent(accessToken)
+    }`;
+    const res = await fetchImpl(url);
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, error: json.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, accessToken: json.access_token, expiresInSeconds: json.expires_in };
+  } catch (err) {
+    return { ok: false, error: `Error de red: ${String(err)}` };
+  }
+}

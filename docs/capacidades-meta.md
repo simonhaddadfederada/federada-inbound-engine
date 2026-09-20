@@ -19,14 +19,24 @@ Por esto, `publishInstagramPost` y `publishInstagramStory`
 publicar de verdad cuando se los invoca. Siguen sin poder ejecutarse
 solos porque `content_config.auto_publish = false`.
 
-### ⚠️ Nuevo blocker encontrado (no es de permisos)
+### ✅ Blocker del token RESUELTO (20/09/2026)
 
-El token de Instagram (Standard Access) es de **corta duración** (dura
-pocas horas) y el intercambio por uno de **larga duración** (60 días,
-`grant_type=ig_exchange_token`) falla con `"Session key invalid"` —
-mismo error reproducible que ya había fallado antes. Hasta resolver esto,
-publicar de forma automática y sostenida (sin que Simón pase un token
-nuevo cada tanto) no es viable. Es la próxima pieza a investigar.
+Causa real encontrada: el token que emite el panel de Meta para
+"Instagram API with Instagram Login" **ya es de larga duración** (60
+días) — no un token corto. Intentábamos "intercambiarlo"
+(`grant_type=ig_exchange_token`, pensado para tokens cortos), y por eso
+Meta respondía `"Session key invalid"`. El endpoint correcto para este
+tipo de token es el de **refresh** (`grant_type=ig_refresh_token`), que
+sí funcionó con una llamada real: devolvió un token nuevo válido por
+~59 días, con los 5 permisos intactos.
+
+Se armó el ciclo automático completo: el token vive en la tabla
+`platform_tokens` (protegida por RLS, nunca en Supabase Secrets porque
+necesita actualizarse sola) y un cron diario (`instagram-token-refresh`)
+lo renueva cuando quedan ≤30 días, mucho antes de que vuelva a vencer.
+Probado en vivo dos veces: una renovación real, y después insights +
+creación de contenedor real usando el token que el propio sistema
+renovó — sin ninguna intervención de Simón.
 
 ## Matriz completa
 

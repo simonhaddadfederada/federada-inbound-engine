@@ -12,7 +12,8 @@
 // nada real todavía — pero el camino ya queda armado.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { publisherFor, type PublishablePiece } from "../_shared/publishers/instagram.ts";
+import { publisherFor, type InstagramCredentials, type PublishablePiece } from "../_shared/publishers/instagram.ts";
+import { getInstagramToken } from "../_shared/instagram_token_store.ts";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -70,17 +71,28 @@ Deno.serve(async (req) => {
     });
   }
 
+  const igUserId = Deno.env.get("INSTAGRAM_BUSINESS_USER_ID");
+  const getCredentials = async (): Promise<InstagramCredentials | null> => {
+    if (!igUserId) return null;
+    const token = await getInstagramToken(supabase);
+    if (!token || new Date(token.expires_at) <= new Date()) return null;
+    return { igUserId, accessToken: token.access_token };
+  };
+
   const results: { slug: string; status: string; detail: string }[] = [];
   for (const piece of due) {
     const publish = publisherFor(piece.format);
-    const result = await publish({
-      id: piece.id,
-      slug: piece.slug,
-      format: piece.format,
-      hook: piece.hook,
-      cta: piece.cta,
-      assetRef: piece.asset_ref ?? null,
-    });
+    const result = await publish(
+      {
+        id: piece.id,
+        slug: piece.slug,
+        format: piece.format,
+        hook: piece.hook,
+        cta: piece.cta,
+        assetRef: piece.asset_ref ?? null,
+      },
+      getCredentials,
+    );
     if (result.status === "published") {
       await supabase
         .from("content_pieces")

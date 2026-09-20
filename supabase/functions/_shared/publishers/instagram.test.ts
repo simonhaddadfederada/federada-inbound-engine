@@ -17,9 +17,11 @@ const BASE: PublishablePiece = {
   assetRef: null,
 };
 
+const noCredentials = () => Promise.resolve(null);
+
 Deno.test("publishInstagramPost/Story sin asset quedan bloqueados por falta de asset, no de permiso", async () => {
-  const post = await publishInstagramPost({ ...BASE, format: "post" });
-  const story = await publishInstagramStory({ ...BASE, format: "story" });
+  const post = await publishInstagramPost({ ...BASE, format: "post" }, noCredentials);
+  const story = await publishInstagramStory({ ...BASE, format: "story" }, noCredentials);
   assertEquals(post.status, "blocked");
   assertEquals(story.status, "blocked");
   if (post.status === "blocked") assertStringIncludes(post.reason, "asset");
@@ -28,14 +30,14 @@ Deno.test("publishInstagramPost/Story sin asset quedan bloqueados por falta de a
 
 Deno.test("publishInstagramPost/Story con asset pero sin credenciales quedan bloqueados por falta de token", async () => {
   const piece = { ...BASE, assetRef: "https://example.com/img.png" };
-  const post = await publishInstagramPost(piece);
+  const post = await publishInstagramPost(piece, noCredentials);
   assertEquals(post.status, "blocked");
-  if (post.status === "blocked") assertStringIncludes(post.reason, "INSTAGRAM_ACCESS_TOKEN");
+  if (post.status === "blocked") assertStringIncludes(post.reason, "platform_tokens");
 });
 
 Deno.test("carousel y reel siguen bloqueados, pero por falta de assets multiples/video, no por permiso", async () => {
-  const carousel = await publishInstagramCarousel(BASE);
-  const reel = await publishInstagramReel(BASE);
+  const carousel = await publishInstagramCarousel(BASE, noCredentials);
+  const reel = await publishInstagramReel(BASE, noCredentials);
   assertEquals(carousel.status, "blocked");
   assertEquals(reel.status, "blocked");
   if (carousel.status === "blocked") assertStringIncludes(carousel.reason, "varias imágenes");
