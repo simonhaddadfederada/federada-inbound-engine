@@ -56,6 +56,75 @@ export async function createStoryContainer(
   );
 }
 
+export async function createVideoContainer(
+  igUserId: string,
+  accessToken: string,
+  videoUrl: string,
+  caption: string,
+  mediaType: "REELS" | "VIDEO" = "REELS",
+  fetchImpl: typeof fetch = fetch,
+): Promise<GraphResult> {
+  return graphPost(
+    `/${igUserId}/media`,
+    { video_url: videoUrl, media_type: mediaType, caption, access_token: accessToken },
+    fetchImpl,
+  );
+}
+
+export type ContainerStatus = "IN_PROGRESS" | "FINISHED" | "ERROR" | "EXPIRED" | "PUBLISHED";
+
+export type ContainerStatusResult =
+  | { ok: true; status: ContainerStatus }
+  | { ok: false; error: string };
+
+export async function getContainerStatus(
+  containerId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ContainerStatusResult> {
+  try {
+    const url = `${GRAPH_BASE}/${containerId}?fields=status_code&access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetchImpl(url);
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, error: json.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, status: json.status_code };
+  } catch (err) {
+    return { ok: false, error: `Error de red: ${String(err)}` };
+  }
+}
+
+export type WaitResult = { ok: true } | { ok: false; error: string };
+
+// A diferencia de una imagen (lista casi al instante), un video/reel se
+// procesa de forma asíncrona en los servidores de Meta — hay que esperar
+// a que el contenedor pase a FINISHED antes de poder publicarlo, o Meta
+// devuelve un error. `delayImpl`/`maxAttempts` son inyectables para no
+// esperar de verdad en los tests.
+export async function waitForContainerReady(
+  containerId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+  maxAttempts = 20,
+  intervalMs = 5000,
+  delayImpl: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<WaitResult> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await getContainerStatus(containerId, accessToken, fetchImpl);
+    if (!result.ok) return { ok: false, error: result.error };
+    if (result.status === "FINISHED") return { ok: true };
+    if (result.status === "ERROR" || result.status === "EXPIRED") {
+      return { ok: false, error: `Meta no pudo procesar el video (status_code=${result.status})` };
+    }
+    if (attempt < maxAttempts) await delayImpl(intervalMs);
+  }
+  return {
+    ok: false,
+    error: "Timeout esperando a que Meta termine de procesar el video (status_code nunca llegó a FINISHED)",
+  };
+}
+
 export async function publishContainer(
   igUserId: string,
   accessToken: string,

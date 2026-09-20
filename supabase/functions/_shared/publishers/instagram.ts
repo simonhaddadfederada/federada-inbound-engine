@@ -19,7 +19,9 @@
 import {
   createImageContainer,
   createStoryContainer,
+  createVideoContainer,
   publishContainerWithRetry,
+  waitForContainerReady,
 } from "./instagram_graph.ts";
 
 export interface PublishablePiece {
@@ -28,6 +30,14 @@ export interface PublishablePiece {
   format: "reel" | "carousel" | "story" | "post";
   hook: string;
   cta: string;
+  // Caption real a publicar (content_pieces.script) — NO piece.cta, que es
+  // solo el llamado a la acción corto usado para revisión/atribución. Bug
+  // real encontrado el 20/09/2026 al preparar la publicación del segundo
+  // Reel: publishInstagramPost usaba piece.cta como caption; la primera
+  // publicación real (Bloque 10) sí había usado el texto completo de
+  // script, a mano, fuera de este adapter — nunca se había corregido acá
+  // porque nunca se había vuelto a publicar nada por este camino.
+  caption: string;
   assetRef: string | null;
   carouselAssets?: string[] | null;
   videoRef?: string | null;
@@ -62,7 +72,7 @@ export async function publishInstagramPost(
 
   let containerId = piece.pendingContainerId ?? null;
   if (!containerId) {
-    const container = await createImageContainer(creds.igUserId, creds.accessToken, piece.assetRef, piece.cta);
+    const container = await createImageContainer(creds.igUserId, creds.accessToken, piece.assetRef, piece.caption);
     if (!container.ok) return { status: "error", detail: container.error };
     containerId = container.id;
   }
@@ -118,7 +128,7 @@ export async function publishInstagramCarousel(
 
 export async function publishInstagramReel(
   piece: PublishablePiece,
-  _getCredentials: CredentialsProvider,
+  getCredentials: CredentialsProvider,
 ): Promise<PublishResult> {
   if (!piece.videoRef) {
     return {
@@ -126,10 +136,34 @@ export async function publishInstagramReel(
       reason: "Falta el video (videoRef) — no se generó todavía para esta pieza.",
     };
   }
-  return {
-    status: "blocked",
-    reason: "Video listo, pero la publicación real todavía no se autorizó/probó en vivo.",
-  };
+  const creds = await getCredentials();
+  if (!creds) return { status: "blocked", reason: NO_TOKEN_REASON };
+
+  let containerId = piece.pendingContainerId ?? null;
+  if (!containerId) {
+    const container = await createVideoContainer(
+      creds.igUserId,
+      creds.accessToken,
+      piece.videoRef,
+      piece.caption,
+      "REELS",
+    );
+    if (!container.ok) return { status: "error", detail: container.error };
+    containerId = container.id;
+  }
+
+  // A diferencia de una imagen, el contenedor de un Reel se procesa de
+  // forma asíncrona en Meta — hay que esperar a que quede FINISHED antes
+  // de intentar publicarlo (containerId ya queda guardado como
+  // pending_container_id por el llamador si esto tarda o falla, así el
+  // próximo intento no vuelve a subir el video de nuevo).
+  const ready = await waitForContainerReady(containerId, creds.accessToken);
+  if (!ready.ok) return { status: "error", detail: ready.error, containerId };
+
+  const published = await publishContainerWithRetry(creds.igUserId, creds.accessToken, containerId);
+  if (!published.ok) return { status: "error", detail: published.error, containerId };
+
+  return { status: "published", externalRef: published.id };
 }
 
 export function publisherFor(

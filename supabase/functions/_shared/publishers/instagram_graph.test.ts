@@ -1,10 +1,13 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   createImageContainer,
   createStoryContainer,
+  createVideoContainer,
+  getContainerStatus,
   publishContainer,
   publishContainerWithRetry,
   refreshLongLivedToken,
+  waitForContainerReady,
 } from "./instagram_graph.ts";
 
 const noDelay = () => Promise.resolve();
@@ -85,6 +88,60 @@ Deno.test("publishContainerWithRetry se rinde despues de maxAttempts y devuelve 
   assertEquals(result.ok, false);
   if (!result.ok) assertEquals(result.error, "sigue fallando");
   assertEquals(calls, 3);
+});
+
+Deno.test("createVideoContainer arma el request con media_type REELS", async () => {
+  let capturedBody = "";
+  const fetchImpl = ((url: string, init?: RequestInit) => {
+    capturedBody = String(init?.body);
+    return Promise.resolve(new Response(JSON.stringify({ id: "c1" }), { status: 200 }));
+  }) as typeof fetch;
+  await createVideoContainer("ig1", "tok", "https://x/reel.mp4", "hola", "REELS", fetchImpl);
+  assertEquals(capturedBody.includes("media_type=REELS"), true);
+  assertEquals(capturedBody.includes("video_url="), true);
+});
+
+Deno.test("getContainerStatus devuelve el status_code real", async () => {
+  const result = await getContainerStatus("c1", "tok", fakeFetch({ status_code: "FINISHED" }));
+  assertEquals(result, { ok: true, status: "FINISHED" });
+});
+
+Deno.test("waitForContainerReady devuelve ok apenas ve FINISHED, sin agotar los intentos", async () => {
+  let calls = 0;
+  const fetchImpl = (() => {
+    calls++;
+    const status = calls < 3 ? "IN_PROGRESS" : "FINISHED";
+    return Promise.resolve(new Response(JSON.stringify({ status_code: status }), { status: 200 }));
+  }) as typeof fetch;
+  const result = await waitForContainerReady("c1", "tok", fetchImpl, 10, 0, noDelay);
+  assertEquals(result, { ok: true });
+  assertEquals(calls, 3);
+});
+
+Deno.test("waitForContainerReady devuelve error real si Meta marca ERROR", async () => {
+  const result = await waitForContainerReady(
+    "c1",
+    "tok",
+    fakeFetch({ status_code: "ERROR" }),
+    10,
+    0,
+    noDelay,
+  );
+  assertEquals(result.ok, false);
+  if (!result.ok) assertStringIncludes(result.error, "ERROR");
+});
+
+Deno.test("waitForContainerReady se rinde con timeout si nunca llega a FINISHED", async () => {
+  const result = await waitForContainerReady(
+    "c1",
+    "tok",
+    fakeFetch({ status_code: "IN_PROGRESS" }),
+    3,
+    0,
+    noDelay,
+  );
+  assertEquals(result.ok, false);
+  if (!result.ok) assertStringIncludes(result.error, "Timeout");
 });
 
 Deno.test("refreshLongLivedToken devuelve error legible si Meta lo rechaza", async () => {

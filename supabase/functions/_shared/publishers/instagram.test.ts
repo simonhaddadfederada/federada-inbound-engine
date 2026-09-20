@@ -14,6 +14,7 @@ const BASE: PublishablePiece = {
   format: "post",
   hook: "hook",
   cta: "cta",
+  caption: "caption completa de prueba",
   assetRef: null,
 };
 
@@ -45,6 +46,13 @@ Deno.test("reel bloqueado por falta de video, no por permiso", async () => {
   const reel = await publishInstagramReel(BASE, noCredentials);
   assertEquals(reel.status, "blocked");
   if (reel.status === "blocked") assertStringIncludes(reel.reason, "video");
+});
+
+Deno.test("reel con video pero sin credenciales queda bloqueado por falta de token", async () => {
+  const piece = { ...BASE, format: "reel" as const, videoRef: "https://example.com/reel.mp4" };
+  const reel = await publishInstagramReel(piece, noCredentials);
+  assertEquals(reel.status, "blocked");
+  if (reel.status === "blocked") assertStringIncludes(reel.reason, "platform_tokens");
 });
 
 Deno.test("carousel con assets pero sin autorizacion real queda bloqueado explicitamente", async () => {
