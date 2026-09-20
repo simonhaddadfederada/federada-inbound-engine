@@ -1,29 +1,31 @@
-"""Reel Engine V3 — genera un Reel real (1080x1920, MP4) a partir de una
-lista de "beats" (unidades de 1-3 segundos), no de 3 escenas estáticas.
+"""Reel Engine V3.1 — como V3, pero la duración de cada beat la marca la
+VOZ REAL (Azure AI Speech, es-AR-ElenaNeural), no un número inventado.
 
-Reglas generales del motor (aplican a CUALQUIER Reel, no a uno puntual):
-- Cambio visual cada 1-3 segundos: cada beat tiene su propio layout y
-  una entrada tipo "pop" rápida (~0.25-0.35s), no fades lentos.
-- Fondo con paneo/zoom continuo + un acento circular con blur que cambia
-  de posición por beat, para que nunca se sienta una placa fija.
-- Safe areas reales: nada de texto/CTA entra en la franja superior
-  (perfil/hora) ni en la inferior (caption, botones de Reels, nombre de
-  usuario) ni en la franja derecha (íconos de like/comentario/compartir).
-- Texto secundario más grande y con menos densidad por pantalla — solo
-  conceptos, nunca el guion completo.
-- Sin audio todavía (ver docs/reel-engine-v3.md) — arquitectura lista
-  para sumar voz+música cuando se apruebe el proveedor.
+Cada beat trae su propio texto hablado. Se sintetiza el guion completo en
+UNA sola llamada (prosodia natural, sin cortes raros entre frases) y se
+usan los eventos de "word boundary" del SDK de Azure para saber
+EXACTAMENTE cuándo se dice cada palabra — de ahí se calcula cuánto dura
+en pantalla cada beat. Nada de sincronización adivinada.
 
-Requiere: Pillow, imageio-ffmpeg (gratis, instalados por pip).
+Reglas del motor (heredadas de V3, ver docs/reel-engine-v3.md):
+- beats de 1-3s con composición distinta cada uno;
+- safe areas reales (no tapar con UI de Reels);
+- texto en pantalla = solo el concepto corto de cada beat, nunca la
+  transcripción completa (evita subtítulo-pared-de-texto).
+
+Requiere: Pillow, imageio-ffmpeg, azure-cognitiveservices-speech (todos
+instalables por pip). Necesita AZURE_SPEECH_KEY/AZURE_SPEECH_REGION.
 """
 
 import os
+import re
 import math
 import shutil
 import subprocess
 import tempfile
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import imageio_ffmpeg
+import azure.cognitiveservices.speech as speechsdk
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_DIR = os.path.join(REPO_ROOT, "assets", "fonts")
@@ -36,9 +38,6 @@ MAGENTA = (240, 78, 152)
 WHITE = (255, 255, 255)
 LIGHT_BLUE = (196, 205, 240)
 
-# Safe areas reales de Instagram Reels (aprox., en px sobre 1080x1920):
-# arriba queda tapado por hora/perfil, abajo por caption + controles,
-# a la derecha por la columna de like/comentario/compartir/guardar.
 SAFE_TOP = 260
 SAFE_BOTTOM = 340
 SAFE_RIGHT = 150
@@ -46,6 +45,71 @@ SAFE_LEFT = 70
 SAFE_W = W - SAFE_LEFT - SAFE_RIGHT
 
 BG_W, BG_H = 1350, 2400
+
+PUNCT_ONLY = re.compile(r'^[¿?¡!.,;:"\'…-]+$')
+
+
+def _load_env():
+    env = {}
+    with open(os.path.join(REPO_ROOT, ".env")) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k] = v
+    return env
+
+
+def synthesize_with_timing(full_text: str, voice: str, out_wav_path: str):
+    """Sintetiza full_text con Azure y devuelve la lista de palabras reales
+    (sin tokens de puntuación sueltos) con su offset/duración exactos."""
+    env = _load_env()
+    speech_config = speechsdk.SpeechConfig(
+        subscription=env["AZURE_SPEECH_KEY"], region=env["AZURE_SPEECH_REGION"]
+    )
+    speech_config.speech_synthesis_voice_name = voice
+    audio_config = speechsdk.audio.AudioOutputConfig(filename=out_wav_path)
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+
+    boundaries = []
+
+    def on_word_boundary(evt):
+        boundaries.append({
+            "text": evt.text,
+            "start_ms": evt.audio_offset / 10000,
+            "duration_ms": evt.duration.total_seconds() * 1000,
+        })
+
+    synthesizer.synthesis_word_boundary.connect(on_word_boundary)
+    result = synthesizer.speak_text_async(full_text).get()
+    if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
+        raise RuntimeError(f"Azure TTS no pudo sintetizar: {result.reason} — {result.cancellation_details}")
+
+    real_words = [b for b in boundaries if not PUNCT_ONLY.fullmatch(b["text"])]
+    return real_words
+
+
+def assign_beat_timing(beats, word_timings, tail_buffer_ms=500):
+    """Consume word_timings secuencialmente segun la cantidad de palabras
+    de cada beat['text']/beat['spoken'], y fija start_ms/duration_ms reales."""
+    cursor = 0
+    for i, beat in enumerate(beats):
+        spoken = beat.get("spoken", beat.get("text", ""))
+        n_words = len(spoken.split())
+        words_for_beat = word_timings[cursor:cursor + n_words]
+        if not words_for_beat:
+            raise ValueError(f"No hay timing de audio para el beat {i} ({spoken!r})")
+        start_ms = words_for_beat[0]["start_ms"]
+        cursor += n_words
+        if cursor < len(word_timings):
+            end_ms = word_timings[cursor]["start_ms"]
+        else:
+            last = words_for_beat[-1]
+            end_ms = last["start_ms"] + last["duration_ms"] + tail_buffer_ms
+        beat["start_ms"] = start_ms
+        beat["duration"] = (end_ms - start_ms) / 1000.0
+    return beats
 
 
 def display_font(size, weight="Black"):
@@ -116,8 +180,6 @@ def build_background(progress, beat_index):
         draw.line([(0, y), (BG_W, y)], fill=(r, g, b))
     draw.rectangle([0, 0, 18, BG_H], fill=MAGENTA)
 
-    # Acento circular con blur, cambia de esquina segun el beat -> "cambio
-    # de composición" real, no solo el texto se mueve.
     corners = [
         (BG_W * 0.12, BG_H * 0.18), (BG_W * 0.88, BG_H * 0.28),
         (BG_W * 0.15, BG_H * 0.75), (BG_W * 0.85, BG_H * 0.8),
@@ -142,9 +204,6 @@ def build_background(progress, beat_index):
 
 def draw_pop_lines(overlay_draw, lines, font, fill, center_y, line_h, anim, highlight_word=None,
                     highlight_fill=MAGENTA, max_x=None):
-    """Texto centrado en el area segura, con pop-in y overshoot leve.
-    highlight_word se busca como substring en CUALQUIER línea (no depende
-    de dónde cortó el wrap) — bug real encontrado al testear la V1 de esto."""
     scale = 0.85 + 0.15 * anim
     alpha = int(255 * min(1.0, anim / 0.6))
     total_h = line_h * len(lines)
@@ -185,12 +244,17 @@ def fit_font(draw, text, max_width, start_size, weight="Black", min_size=48, ste
     return f, wrap_text(draw, text, f, max_width), min_size
 
 
-def render_reel(beats, cta_text, subcta_text, handle_text, output_path):
+def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice="es-AR-ElenaNeural"):
+    # 1) Sintetizar el guion completo y repartir timing real por beat.
+    full_script = ". ".join(b.get("spoken", b.get("text", "")) for b in beats)
+    tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
+    wav_path = os.path.join(tmp_dir, "voice.wav")
+    word_timings = synthesize_with_timing(full_script, voice, wav_path)
+    beats = assign_beat_timing(beats, word_timings)
+
     total_duration = sum(b["duration"] for b in beats)
     n_frames = int(total_duration * FPS)
-    tmp_dir = tempfile.mkdtemp(prefix="reelv3_frames_")
 
-    # Precomputar limites (tiempo de inicio) de cada beat
     starts = []
     acc = 0.0
     for b in beats:
@@ -222,7 +286,7 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path):
             if kind in ("hook", "hook_punch", "line", "question"):
                 start_size = 100 if kind == "hook_punch" else 84
                 f, lines, _ = fit_font(probe_draw, beat["text"], SAFE_W, start_size)
-                line_h = int(_ * 1.12) if False else int(f.size * 1.14)
+                line_h = int(f.size * 1.14)
                 draw_pop_lines(
                     odraw, lines, f, WHITE, safe_center_y, line_h, local_anim,
                     highlight_word=beat.get("highlight"),
@@ -244,7 +308,6 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path):
             elif kind == "stat":
                 f_stat, stat_lines, _ = fit_font(probe_draw, beat["text"], SAFE_W, 108, min_size=64)
                 line_h = int(f_stat.size * 1.1)
-                # Barra "resaltador" detras del texto principal
                 stat_w = max(odraw.textbbox((0, 0), l, font=f_stat)[2] for l in stat_lines)
                 bar_alpha = int(160 * min(1.0, local_anim))
                 bar_y0 = safe_center_y - (len(stat_lines) * line_h) / 2 - 10
@@ -309,16 +372,30 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path):
             frame.convert("RGB").save(os.path.join(tmp_dir, f"frame_{i:05d}.png"))
 
         ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
-        cmd = [
+        silent_path = os.path.join(tmp_dir, "silent.mp4")
+        cmd_video = [
             ffmpeg_bin, "-y",
             "-framerate", str(FPS),
             "-i", os.path.join(tmp_dir, "frame_%05d.png"),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            silent_path,
+        ]
+        r1 = subprocess.run(cmd_video, capture_output=True, text=True)
+        if r1.returncode != 0:
+            raise RuntimeError(f"ffmpeg (video) fallo: {r1.stderr[-2000:]}")
+
+        cmd_mux = [
+            ffmpeg_bin, "-y",
+            "-i", silent_path,
+            "-i", wav_path,
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+            "-map", "0:v:0", "-map", "1:a:0",
+            "-shortest", "-movflags", "+faststart",
             output_path,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg fallo: {result.stderr[-2000:]}")
+        r2 = subprocess.run(cmd_mux, capture_output=True, text=True)
+        if r2.returncode != 0:
+            raise RuntimeError(f"ffmpeg (mux audio) fallo: {r2.stderr[-2000:]}")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -328,19 +405,21 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path):
 if __name__ == "__main__":
     beats = [
         {"type": "question", "text": "¿SOS MONOTRIBUTISTA Y NO SABÉS EN QUÉ CATEGORÍA ESTÁS?",
-         "highlight": "CATEGORÍA", "duration": 2.6},
+         "spoken": "¿Sos monotributista y no sabés en qué categoría estás?",
+         "highlight": "CATEGORÍA"},
         {"type": "stat", "text": "UNA PARTE DE TU CUOTA", "sub": "va directo a tu cobertura médica.",
-         "duration": 2.4},
+         "spoken": "Una parte de tu cuota va directo a tu cobertura médica."},
         {"type": "line", "text": "Y la mayoría no sabe", "sub": "cuánto es, ni qué puede hacer con eso.",
-         "duration": 2.6},
-        {"type": "hook_punch", "text": "PODÉS SABERLO EN 2 MINUTOS.", "highlight": "MINUTOS.", "duration": 2.0},
-        {"type": "cta", "duration": 3.2},
+         "spoken": "Y la mayoría no sabe cuánto es, ni qué puede hacer con eso."},
+        {"type": "hook_punch", "text": "PODÉS SABERLO EN DOS MINUTOS.", "highlight": "MINUTOS.",
+         "spoken": "Podés saberlo en dos minutos."},
+        {"type": "cta", "spoken": "Escribime PLAN y vemos qué te conviene según tu categoría."},
     ]
     out, dur = render_reel(
         beats,
         cta_text="Escribime PLAN",
         subcta_text="y vemos qué te conviene según tu categoría.",
         handle_text="@simoonhaddad · Asesor Federada Salud",
-        output_path=os.path.join(REPO_ROOT, "assets", "generated", "reel-monotributo-cobertura.mp4"),
+        output_path=os.path.join(REPO_ROOT, "assets", "generated", "reel-monotributo-cobertura-voz.mp4"),
     )
     print("listo", out, f"{dur:.1f}s")
