@@ -51,15 +51,44 @@ la duración real de cada beat a partir de ahí — nunca un tiempo inventado.
 sobra margen dentro de los 30.000 caracteres/mes que incluye el plan
 Starter — no se espera pagar de más.
 
-### Música de fondo
+### Preset de voz definitivo (elegido 20/09/2026, no volver a comparar)
 
-No se descargó ningún archivo de terceros (evita cualquier duda de
-copyright). Camino recomendado para V3: generar un fondo simple
-programáticamente (tonos/pulsos sintetizados con Python, 100% original,
-costo cero, cero riesgo legal) y mezclarlo bajo la voz con ffmpeg.
-Alternativa de mayor calidad de producción: bibliotecas con licencia
-(Epidemic Sound / Artlist, ~USD 10-15/mes) — no se contrató, queda
-pendiente si en algún momento se quiere subir la producción.
+`MELANIE_ENERGICA` en `scripts/render_reel_asset.py` — única fuente de
+verdad, reutilizar tal cual en todo Reel nuevo:
+
+```python
+{
+  "voice_id": "bN1bDXgDIGX5lw0rtY2B",  # Melanie
+  "model_id": "eleven_v3",             # unico modelo con audio tags
+  "voice_settings": {
+    "stability": 0.3, "similarity_boost": 0.8,
+    "style": 0.45, "use_speaker_boost": True, "speed": 1.05,
+  },
+}
+```
+
+Dirección de guion: `[curious]` al inicio del hook, `[upbeat]` antes del
+CTA — nunca más de 1-2 tags por guion, nunca gritos ni actuación
+exagerada. Los audio tags NO se leen en voz alta (verificado: ocupan
+~48ms de silencio real en el timing, no texto hablado).
+
+### Música + mezcla (20/09/2026)
+
+**Eleven Music**, incluida en el mismo plan Starter (~900 créditos/min,
+irrelevante a la duración de un Reel de 15-20s). Se pidió activar el
+permiso `music_generation` en la API key (no estaba habilitado por
+default). Mezcla real con `ffmpeg` en `mix_voice_and_music()`:
+
+- `sidechaincompress`: la música se atenúa automáticamente cuando
+  Melanie habla (ducking real, no un volumen fijo).
+- Volumen base de música reducido (~45% después del ducking) para que
+  nunca compita con la voz.
+- `afade` de entrada/salida cortos (0.25s / 0.5s).
+- `loudnorm` (integrated loudness -16 LUFS, true peak -1.5 dB) para
+  normalizar y evitar clipping en la salida final.
+
+**Probado de punta a punta**: Reel real de 20.4s, video H.264 + audio
+AAC mezclado, mostrado a Simón antes de cualquier publicación.
 
 ## Material visual
 

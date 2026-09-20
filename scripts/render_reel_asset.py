@@ -31,7 +31,20 @@ import urllib.request
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import imageio_ffmpeg
 
-MELANIE_VOICE_ID = "bN1bDXgDIGX5lw0rtY2B"  # ElevenLabs, "Melanie - Ecommerce Voice", es-AR
+# Preset de voz definitivo (elegido por Simón, 20/09/2026): Melanie, perfil
+# ENÉRGICA. Reutilizar este dict tal cual para todo Reel nuevo — es la
+# única fuente de verdad de los parámetros de voz del motor.
+MELANIE_ENERGICA = {
+    "voice_id": "bN1bDXgDIGX5lw0rtY2B",  # ElevenLabs, "Melanie - Ecommerce Voice", es-AR
+    "model_id": "eleven_v3",  # unico modelo que admite audio tags ([curious], [upbeat], etc.)
+    "voice_settings": {
+        "stability": 0.3,
+        "similarity_boost": 0.8,
+        "style": 0.45,
+        "use_speaker_boost": True,
+        "speed": 1.05,
+    },
+}
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_DIR = os.path.join(REPO_ROOT, "assets", "fonts")
@@ -53,6 +66,13 @@ SAFE_W = W - SAFE_LEFT - SAFE_RIGHT
 BG_W, BG_H = 1350, 2400
 
 PUNCT_ONLY = re.compile(r'^[¿?¡!.,;:"\'…-]+$')
+TAG_ONLY = re.compile(r'^\[.*\]$')  # audio tags de Eleven v3 ([curious], [upbeat], etc.) — no son palabras
+
+
+def count_real_words(text: str) -> int:
+    """Cuenta palabras excluyendo audio tags — para que el conteo coincida
+    con real_words (que tambien los filtra) al repartir el timing por beat."""
+    return len([w for w in text.split() if not TAG_ONLY.fullmatch(w)])
 
 
 def _load_env():
@@ -67,15 +87,20 @@ def _load_env():
     return env
 
 
-def synthesize_with_timing(full_text: str, voice_id: str, out_audio_path: str):
-    """Sintetiza full_text con ElevenLabs (with-timestamps) y devuelve la
-    lista de palabras reales con su offset/duración exactos, reconstruidas
-    a partir del timing por caracter que da la API."""
+def synthesize_with_timing(full_text: str, voice_preset: dict, out_audio_path: str):
+    """Sintetiza full_text con ElevenLabs (with-timestamps) usando el preset
+    de voz dado (voice_id/model_id/voice_settings) y devuelve la lista de
+    palabras reales con su offset/duración exactos, reconstruidas a partir
+    del timing por caracter que da la API."""
     env = _load_env()
     key = env["ELEVENLABS_API_KEY"]
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
-    body = json.dumps({"text": full_text, "model_id": "eleven_multilingual_v2"}).encode("utf-8")
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_preset['voice_id']}/with-timestamps"
+    body = json.dumps({
+        "text": full_text,
+        "model_id": voice_preset["model_id"],
+        "voice_settings": voice_preset["voice_settings"],
+    }).encode("utf-8")
     req = urllib.request.Request(
         url, data=body, method="POST",
         headers={"xi-api-key": key, "Content-Type": "application/json"},
@@ -110,17 +135,21 @@ def synthesize_with_timing(full_text: str, voice_id: str, out_audio_path: str):
     if current:
         words.append({"text": current, "start_ms": word_start * 1000, "duration_ms": (word_end - word_start) * 1000})
 
-    real_words = [w for w in words if not PUNCT_ONLY.fullmatch(w["text"])]
+    real_words = [
+        w for w in words if not PUNCT_ONLY.fullmatch(w["text"]) and not TAG_ONLY.fullmatch(w["text"])
+    ]
     return real_words
 
 
 def assign_beat_timing(beats, word_timings, tail_buffer_ms=500):
     """Consume word_timings secuencialmente segun la cantidad de palabras
-    de cada beat['text']/beat['spoken'], y fija start_ms/duration_ms reales."""
+    de cada beat['text']/beat['spoken'], y fija start_ms/duration_ms reales.
+    count_real_words excluye audio tags para que el conteo coincida con
+    word_timings (que tambien los filtra)."""
     cursor = 0
     for i, beat in enumerate(beats):
         spoken = beat.get("spoken", beat.get("text", ""))
-        n_words = len(spoken.split())
+        n_words = count_real_words(spoken)
         words_for_beat = word_timings[cursor:cursor + n_words]
         if not words_for_beat:
             raise ValueError(f"No hay timing de audio para el beat {i} ({spoken!r})")
@@ -268,12 +297,65 @@ def fit_font(draw, text, max_width, start_size, weight="Black", min_size=48, ste
     return f, wrap_text(draw, text, f, max_width), min_size
 
 
-def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_id=MELANIE_VOICE_ID):
+def generate_music(prompt: str, length_ms: int, out_path: str):
+    """Genera música instrumental con Eleven Music (incluido en el plan
+    Starter, ~900 créditos/minuto). Requiere el permiso music_generation
+    habilitado en la API key."""
+    env = _load_env()
+    key = env["ELEVENLABS_API_KEY"]
+    body = json.dumps({"prompt": prompt, "music_length_ms": length_ms}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.elevenlabs.io/v1/music",
+        data=body, method="POST",
+        headers={"xi-api-key": key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            audio = resp.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Eleven Music no pudo generar ({e.code}): {e.read().decode()}")
+    with open(out_path, "wb") as f:
+        f.write(audio)
+    return out_path
+
+
+def mix_voice_and_music(voice_path: str, music_path: str, total_duration: float, out_path: str):
+    """Mezcla voz + música con ducking real (sidechaincompress: la música
+    baja cuando Melanie habla, sube apenas en las pausas), fade in/out
+    cortos y normalización de loudness para evitar clipping."""
+    ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
+    fade_out_start = max(0.0, total_duration - 0.6)
+    filter_complex = (
+        "[1:a]volume=0.85[music_pre];"
+        "[music_pre][0:a]sidechaincompress=threshold=0.02:ratio=15:attack=5:release=350:makeup=1[music_ducked];"
+        "[music_ducked]volume=0.45[music_final];"
+        "[0:a][music_final]amix=inputs=2:duration=first:weights='1 0.9'[premix];"
+        f"[premix]afade=t=in:st=0:d=0.25,afade=t=out:st={fade_out_start:.2f}:d=0.5,"
+        "loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
+    )
+    cmd = [
+        ffmpeg_bin, "-y",
+        "-i", voice_path,
+        "-i", music_path,
+        "-filter_complex", filter_complex,
+        "-map", "[aout]",
+        "-t", f"{total_duration:.3f}",
+        "-c:a", "aac", "-b:a", "160k",
+        out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg (mezcla con ducking) falló: {result.stderr[-2500:]}")
+    return out_path
+
+
+def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_preset=MELANIE_ENERGICA,
+                 music_prompt=None):
     # 1) Sintetizar el guion completo y repartir timing real por beat.
     full_script = ". ".join(b.get("spoken", b.get("text", "")) for b in beats)
     tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
-    audio_path = os.path.join(tmp_dir, "voice.mp3")
-    word_timings = synthesize_with_timing(full_script, voice_id, audio_path)
+    voice_path = os.path.join(tmp_dir, "voice.mp3")
+    word_timings = synthesize_with_timing(full_script, voice_preset, voice_path)
     beats = assign_beat_timing(beats, word_timings)
 
     total_duration = sum(b["duration"] for b in beats)
@@ -408,11 +490,24 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_id
         if r1.returncode != 0:
             raise RuntimeError(f"ffmpeg (video) fallo: {r1.stderr[-2000:]}")
 
+        # 2) Música + mezcla con ducking (si se pidió music_prompt), o solo
+        # la voz (comportamiento anterior) si no.
+        final_audio_path = voice_path
+        if music_prompt:
+            music_path = os.path.join(tmp_dir, "music.mp3")
+            # Eleven Music pide un minimo de duracion; pedimos un poco mas
+            # y despues se recorta al total_duration real en la mezcla.
+            music_len_ms = max(int(total_duration * 1000) + 2000, 10000)
+            generate_music(music_prompt, music_len_ms, music_path)
+            mixed_path = os.path.join(tmp_dir, "mixed.m4a")
+            mix_voice_and_music(voice_path, music_path, total_duration, mixed_path)
+            final_audio_path = mixed_path
+
         cmd_mux = [
             ffmpeg_bin, "-y",
             "-i", silent_path,
-            "-i", audio_path,
-            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+            "-i", final_audio_path,
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
             "-map", "0:v:0", "-map", "1:a:0",
             "-shortest", "-movflags", "+faststart",
             output_path,
@@ -427,9 +522,11 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_id
 
 
 if __name__ == "__main__":
+    # Mismo guion/contenido que la version anterior — solo se agrega la
+    # direccion de voz (audio tags) del preset ENERGICA elegido por Simon.
     beats = [
         {"type": "question", "text": "¿SOS MONOTRIBUTISTA Y NO SABÉS EN QUÉ CATEGORÍA ESTÁS?",
-         "spoken": "¿Sos monotributista y no sabés en qué categoría estás?",
+         "spoken": "[curious] ¿Sos monotributista y no sabés en qué categoría estás?",
          "highlight": "CATEGORÍA"},
         {"type": "stat", "text": "UNA PARTE DE TU CUOTA", "sub": "va directo a tu cobertura médica.",
          "spoken": "Una parte de tu cuota va directo a tu cobertura médica."},
@@ -437,13 +534,19 @@ if __name__ == "__main__":
          "spoken": "Y la mayoría no sabe cuánto es, ni qué puede hacer con eso."},
         {"type": "hook_punch", "text": "PODÉS SABERLO EN DOS MINUTOS.", "highlight": "MINUTOS.",
          "spoken": "Podés saberlo en dos minutos."},
-        {"type": "cta", "spoken": "Escribime PLAN y vemos qué te conviene según tu categoría."},
+        {"type": "cta", "spoken": "[upbeat] Escribime PLAN y vemos qué te conviene según tu categoría."},
     ]
     out, dur = render_reel(
         beats,
         cta_text="Escribime PLAN",
         subcta_text="y vemos qué te conviene según tu categoría.",
         handle_text="@simoonhaddad · Asesor Federada Salud",
-        output_path=os.path.join(REPO_ROOT, "assets", "generated", "reel-monotributo-cobertura-voz.mp4"),
+        output_path=os.path.join(REPO_ROOT, "assets", "generated", "reel-monotributo-cobertura-final.mp4"),
+        voice_preset=MELANIE_ENERGICA,
+        music_prompt=(
+            "Modern minimal instrumental background music, subtle rhythmic pulse, clean, "
+            "commercial energy but understated, suitable for a health insurance brand, "
+            "no vocals, no lyrics, no epic orchestral elements, no drums, unobtrusive"
+        ),
     )
     print("listo", out, f"{dur:.1f}s")
