@@ -182,16 +182,16 @@ def render_carousel_piece(piece_id, render_spec, supabase_url, service_key):
     return {"carousel_assets": urls}
 
 
-def main():
-    supabase_url = env("SUPABASE_URL")
-    service_key = env("SUPABASE_SERVICE_ROLE_KEY")
-    bot_token = env("TELEGRAM_BOT_TOKEN", required=False) or ""
-    chat_id = env("TELEGRAM_CHAT_ID", required=False) or ""
+MAX_PIECES_PER_RUN = 3  # límite de tiempo del job (timeout-minutes: 15), no de negocio
 
+
+def process_one(supabase_url, service_key, bot_token, chat_id):
+    """Reclama y renderiza UNA pieza. Devuelve False si no había nada
+    pendiente (para que main() corte el loop), True si procesó algo
+    (haya salido bien o mal — el error ya queda guardado/alertado)."""
     piece = claim_pending_piece(supabase_url, service_key)
     if not piece:
-        print("Nada pendiente de renderizar (o todo está siendo renderizado ahora). Listo.")
-        return
+        return False
 
     piece_id = piece["id"]
     slug = piece["slug"]
@@ -211,7 +211,7 @@ def main():
             body={"status": "render_failed", "last_render_error": f"El worker cloud no sabe renderizar el formato '{fmt}'."},
         )
         print(f"'{fmt}' no tiene renderer — marcado render_failed.")
-        return
+        return True
 
     render_spec = piece.get("render_spec")
     if not render_spec:
@@ -220,7 +220,7 @@ def main():
             body={"status": "render_failed", "last_render_error": "Falta render_spec (beats/cta/música) para esta pieza."},
         )
         print("Falta render_spec — marcado render_failed (no se inventa un guion).")
-        return
+        return True
 
     try:
         update_fields = renderer(piece_id, render_spec, supabase_url, service_key)
@@ -237,6 +237,7 @@ def main():
             },
         )
         print(f"'{slug}' -> status=listo")
+        return True
 
     except Exception as err:
         attempts = (piece.get("render_attempts") or 0) + 1
@@ -258,6 +259,31 @@ def main():
                 body={"render_attempts": attempts, "last_render_error": str(err)[:2000], "render_started_at": None},
             )
             print("Se reintentará en la próxima corrida programada.")
+        return "error"
+
+
+def main():
+    supabase_url = env("SUPABASE_URL")
+    service_key = env("SUPABASE_SERVICE_ROLE_KEY")
+    bot_token = env("TELEGRAM_BOT_TOKEN", required=False) or ""
+    chat_id = env("TELEGRAM_CHAT_ID", required=False) or ""
+
+    any_error = False
+    processed = 0
+    for _ in range(MAX_PIECES_PER_RUN):
+        result = process_one(supabase_url, service_key, bot_token, chat_id)
+        if not result:
+            break
+        processed += 1
+        if result == "error":
+            any_error = True
+
+    if processed == 0:
+        print("Nada pendiente de renderizar (o todo está siendo renderizado ahora). Listo.")
+    else:
+        print(f"Procesadas {processed} pieza(s) esta corrida.")
+
+    if any_error:
         sys.exit(1)
 
 
