@@ -78,8 +78,14 @@ def count_real_words(text: str) -> int:
 def _load_env():
     """En GitHub Actions (o cualquier entorno cloud) los secrets ya vienen
     como variables de entorno reales — no hay ningún .env que leer. Local,
-    seguimos leyendo .env como siempre. os.environ tiene prioridad."""
-    env = dict(os.environ)
+    seguimos leyendo .env como siempre. os.environ tiene prioridad.
+
+    .strip() en los valores: un secret cargado a mano a veces trae un
+    salto de línea de sobra al final (copiando la línea completa desde
+    una terminal) — encontrado de verdad el 20/09/2026 con SUPABASE_URL
+    en GitHub Actions, rompía urllib con "URL can't contain control
+    characters"."""
+    env = {k: v.strip() for k, v in os.environ.items()}
     env_path = os.path.join(REPO_ROOT, ".env")
     if os.path.exists(env_path):
         with open(env_path) as f:
@@ -88,7 +94,7 @@ def _load_env():
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 k, v = line.split("=", 1)
-                env.setdefault(k, v)
+                env.setdefault(k, v.strip())
     return env
 
 

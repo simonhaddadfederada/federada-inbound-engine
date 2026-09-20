@@ -33,7 +33,13 @@ MAX_ATTEMPTS = 3
 
 
 def env(name, required=True):
+    # .strip(): un secret cargado a mano en GitHub a veces trae un salto de
+    # línea de sobra al final (copiando la línea completa desde una
+    # terminal) — encontrado de verdad el 20/09/2026 con SUPABASE_URL,
+    # que rompía urllib con "URL can't contain control characters".
     v = os.environ.get(name)
+    if v is not None:
+        v = v.strip()
     if required and not v:
         raise RuntimeError(f"Falta la variable de entorno {name}")
     return v
