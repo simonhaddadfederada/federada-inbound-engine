@@ -52,10 +52,16 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-def render_post(hook_lines, highlight_word, sub_text, cta_text, subcta_text, handle_text, output_path):
+def render_post(hook_lines, highlight_word, sub_text, cta_text, subcta_text, handle_text, output_path,
+                 canvas_size=None, bottom_safe=110):
     """hook_lines: lista de 1-2 strings (el corte de línea se respeta tal cual).
     highlight_word: palabra dentro de la ÚLTIMA línea del hook que va en magenta
-    (debe aparecer al final de esa línea). Puede ser None."""
+    (debe aparecer al final de esa línea). Puede ser None.
+
+    canvas_size/bottom_safe: permiten reusar este mismo layout para Stories
+    (1080x1920, con más margen inferior para no quedar tapado por la barra
+    de respuesta nativa de Instagram) sin duplicar todo el dibujo."""
+    W, H = canvas_size or (globals()["W"], globals()["H"])
     img = Image.new("RGB", (W, H), NAVY)
     draw = ImageDraw.Draw(img)
 
@@ -96,9 +102,9 @@ def render_post(hook_lines, highlight_word, sub_text, cta_text, subcta_text, han
     f_subcta = text_font(33, "Medium")
 
     GAP_HOOK_SUB, GAP_SUB_CTA, GAP_CTA_SUBCTA = 55, 70, 36
-    total_h = hook_block_h + GAP_HOOK_SUB + sub_block_h + GAP_SUB_CTA + pill_h + GAP_CTA_SUBCTA + 40
-    firma_zone = 110
-    start_y = max(110, (H - firma_zone - total_h) // 2)
+    subcta_extra = GAP_CTA_SUBCTA + 40 if subcta_text else 0
+    total_h = hook_block_h + GAP_HOOK_SUB + sub_block_h + GAP_SUB_CTA + pill_h + subcta_extra
+    start_y = max(bottom_safe, (H - bottom_safe - total_h) // 2)
 
     y = start_y
     for i, line in enumerate(hook_lines):
@@ -137,14 +143,27 @@ def render_post(hook_lines, highlight_word, sub_text, cta_text, subcta_text, han
         fill=WHITE,
     )
 
-    y = pill_y1 + GAP_CTA_SUBCTA
-    draw.text((MARGIN, y), subcta_text, font=f_subcta, fill=LIGHT_BLUE)
+    if subcta_text:
+        y = pill_y1 + GAP_CTA_SUBCTA
+        draw.text((MARGIN, y), subcta_text, font=f_subcta, fill=LIGHT_BLUE)
 
     f_handle = text_font(26, "Regular")
-    draw.text((MARGIN, H - 66), handle_text, font=f_handle, fill=WHITE)
+    draw.text((MARGIN, H - min(66, bottom_safe)), handle_text, font=f_handle, fill=WHITE)
 
     img.save(output_path)
     return output_path
+
+
+def render_story(hook_lines, highlight_word, sub_text, cta_text, subcta_text, handle_text, output_path):
+    """Story real (1080x1920) — mismo lenguaje visual que el post, pero con
+    más margen arriba/abajo para no quedar tapado por la hora/perfil o la
+    barra de respuesta nativa de Instagram. La API no soporta CTAs
+    interactivos en Stories (link/poll/sticker) — el CTA acá es solo texto
+    ("Escribime X"), igual que ya se documentó en docs/revision-contenido.md."""
+    return render_post(
+        hook_lines, highlight_word, sub_text, cta_text, subcta_text, handle_text, output_path,
+        canvas_size=(1080, 1920), bottom_safe=260,
+    )
 
 
 if __name__ == "__main__":

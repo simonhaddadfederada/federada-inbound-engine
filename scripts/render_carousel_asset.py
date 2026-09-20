@@ -107,6 +107,54 @@ def render_slide(kind, index, total, title, body_lines, output_path, cta_text=No
                 draw.text((MARGIN, y), line, font=f_sub, fill=LIGHT_BLUE)
                 y += 46
 
+    elif kind == "stat":
+        # Slide de dato/número destacado — variedad visual real frente a
+        # "content" (párrafo a la izquierda): número grande centrado
+        # sobre un bloque de acento, para que no todas las slides se
+        # vean iguales (pedido explícito: nada de "6 placas iguales").
+        f_stat = display_font(112, "Black")
+        stat_lines = wrap_text(draw, title, f_stat, max_w)
+        line_h = 118
+        block_h = line_h * len(stat_lines) + 90
+        block_y0 = H * 0.32
+        draw.rounded_rectangle([MARGIN, block_y0, W - MARGIN, block_y0 + block_h], radius=28, fill=MAGENTA)
+        y = block_y0 + 45
+        for line in stat_lines:
+            bbox = draw.textbbox((0, 0), line, font=f_stat)
+            lw = bbox[2] - bbox[0]
+            draw.text((MARGIN + (max_w - lw) / 2, y), line, font=f_stat, fill=WHITE)
+            y += line_h
+        if body_lines:
+            f_body = text_font(38, "Medium")
+            y = block_y0 + block_h + 50
+            for para in body_lines:
+                for line in wrap_text(draw, para, f_body, max_w):
+                    draw.text((MARGIN, y), line, font=f_body, fill=WHITE)
+                    y += 52
+
+    elif kind == "comparison":
+        # Dos columnas — para contrastar dos opciones (ej. obra social vs
+        # prepaga) en una sola slide en vez de una lista de texto plana.
+        f_title = display_font(48, "ExtraBold")
+        title_lines = wrap_text(draw, title, f_title, max_w)
+        y = 150
+        for line in title_lines:
+            draw.text((MARGIN, y), line, font=f_title, fill=MAGENTA)
+            y += 58
+        y += 40
+        col_w = (max_w - 50) / 2
+        col_x = [MARGIN, MARGIN + col_w + 50]
+        draw.line([(W / 2, y), (W / 2, H - 140)], fill=LIGHT_BLUE, width=2)
+        f_label = display_font(34, "ExtraBold")
+        f_body = text_font(34, "Medium")
+        for i, col in enumerate(body_lines[:2]):
+            cy = y
+            draw.text((col_x[i], cy), col.get("label", ""), font=f_label, fill=WHITE)
+            cy += 54
+            for line in wrap_text(draw, col.get("text", ""), f_body, col_w):
+                draw.text((col_x[i], cy), line, font=f_body, fill=LIGHT_BLUE)
+                cy += 46
+
     if handle_text:
         f_handle = text_font(26, "Regular")
         draw.text((MARGIN, H - 66), handle_text, font=f_handle, fill=WHITE)

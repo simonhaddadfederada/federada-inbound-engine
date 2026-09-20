@@ -29,6 +29,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 
 from render_reel_asset import render_from_spec  # noqa: E402
+from render_post_asset import render_post, render_story  # noqa: E402
+from render_carousel_asset import render_slide  # noqa: E402
 
 MAX_ATTEMPTS = 3
 
@@ -113,14 +115,14 @@ def claim_pending_piece(supabase_url, service_key):
     return None
 
 
-def upload_to_storage(supabase_url, service_key, bucket, object_path, file_path):
+def upload_to_storage(supabase_url, service_key, bucket, object_path, file_path, content_type):
     with open(file_path, "rb") as f:
         data = f.read()
     url = f"{supabase_url}/storage/v1/object/{bucket}/{object_path}"
     req = urllib.request.Request(url, data=data, method="POST", headers={
         "apikey": service_key,
         "Authorization": f"Bearer {service_key}",
-        "Content-Type": "video/mp4",
+        "Content-Type": content_type,
         "x-upsert": "true",
     })
     try:
@@ -129,6 +131,55 @@ def upload_to_storage(supabase_url, service_key, bucket, object_path, file_path)
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Subida a Storage falló ({e.code}): {e.read().decode()}")
     return f"{supabase_url}/storage/v1/object/public/{bucket}/{object_path}"
+
+
+def render_reel_piece(piece_id, render_spec, supabase_url, service_key):
+    out_path = f"/tmp/{piece_id}.mp4"
+    _, duration = render_from_spec(render_spec, out_path)
+    print(f"Render ok: {duration:.1f}s")
+    public_url = upload_to_storage(
+        supabase_url, service_key, "content-assets", f"reels/{piece_id}.mp4", out_path, "video/mp4",
+    )
+    return {"video_ref": public_url}
+
+
+def render_post_piece(piece_id, render_spec, supabase_url, service_key, story=False):
+    out_path = f"/tmp/{piece_id}.png"
+    fn = render_story if story else render_post
+    fn(
+        hook_lines=render_spec["hook_lines"],
+        highlight_word=render_spec.get("highlight_word"),
+        sub_text=render_spec.get("sub_text", ""),
+        cta_text=render_spec["cta_text"],
+        subcta_text=render_spec.get("subcta_text"),
+        handle_text=render_spec.get("handle_text", "@simoonhaddad · Asesor Federada Salud"),
+        output_path=out_path,
+    )
+    prefix = "stories" if story else "posts"
+    public_url = upload_to_storage(
+        supabase_url, service_key, "content-assets", f"{prefix}/{piece_id}.png", out_path, "image/png",
+    )
+    return {"asset_ref": public_url}
+
+
+def render_carousel_piece(piece_id, render_spec, supabase_url, service_key):
+    slides = render_spec["slides"]
+    handle_text = render_spec.get("handle_text", "@simoonhaddad · Asesor Federada Salud")
+    total = len(slides)
+    urls = []
+    for i, s in enumerate(slides, start=1):
+        out_path = f"/tmp/{piece_id}-slide-{i}.png"
+        render_slide(
+            kind=s["kind"], index=i, total=total, title=s.get("title", ""),
+            body_lines=s.get("body", []), output_path=out_path,
+            cta_text=s.get("cta"), subcta_text=s.get("subcta"), handle_text=handle_text,
+        )
+        public_url = upload_to_storage(
+            supabase_url, service_key, "content-assets", f"carousels/{piece_id}/slide-{i}.png", out_path,
+            "image/png",
+        )
+        urls.append(public_url)
+    return {"carousel_assets": urls}
 
 
 def main():
@@ -147,12 +198,19 @@ def main():
     fmt = piece["format"]
     print(f"Reclamada: {slug} ({fmt}, id={piece_id})")
 
-    if fmt != "reel":
+    RENDERERS = {
+        "reel": render_reel_piece,
+        "post": render_post_piece,
+        "carousel": render_carousel_piece,
+        "story": lambda *a: render_post_piece(*a, story=True),
+    }
+    renderer = RENDERERS.get(fmt)
+    if not renderer:
         rest_request(
             "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
-            body={"status": "render_failed", "last_render_error": f"El worker cloud todavía solo renderiza reels, no {fmt}."},
+            body={"status": "render_failed", "last_render_error": f"El worker cloud no sabe renderizar el formato '{fmt}'."},
         )
-        print(f"'{fmt}' todavía no está soportado en el worker cloud — marcado render_failed.")
+        print(f"'{fmt}' no tiene renderer — marcado render_failed.")
         return
 
     render_spec = piece.get("render_spec")
@@ -164,26 +222,21 @@ def main():
         print("Falta render_spec — marcado render_failed (no se inventa un guion).")
         return
 
-    out_path = f"/tmp/{piece_id}.mp4"
     try:
-        _, duration = render_from_spec(render_spec, out_path)
-        print(f"Render ok: {duration:.1f}s")
-
-        object_path = f"reels/{piece_id}.mp4"
-        public_url = upload_to_storage(supabase_url, service_key, "content-assets", object_path, out_path)
-        print(f"Subido: {public_url}")
+        update_fields = renderer(piece_id, render_spec, supabase_url, service_key)
+        print(f"Render ok: {update_fields}")
 
         rest_request(
             "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
             body={
                 "status": "listo",
-                "video_ref": public_url,
                 "render_attempts": 0,
                 "last_render_error": None,
                 "render_started_at": None,
+                **update_fields,
             },
         )
-        print(f"'{slug}' -> status=listo, video_ref={public_url}")
+        print(f"'{slug}' -> status=listo")
 
     except Exception as err:
         attempts = (piece.get("render_attempts") or 0) + 1
