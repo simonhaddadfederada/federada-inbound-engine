@@ -5,6 +5,13 @@ Se marca ✅ solo cuando algo fue efectivamente probado, no solo escrito.
 ## Seguridad
 - [x] **RLS activado en las 4 tablas** (`supabase/migrations/0002_enable_rls.sql`) — se detectó que la clave pública podía leer y escribir libremente (nombres y teléfonos incluidos) porque la migración inicial nunca activó Row Level Security. Verificado antes y después del fix con inserciones/lecturas reales: antes la clave pública leía todo, ahora devuelve vacío y rechaza inserciones (`42501`); la clave secreta y las Edge Functions siguen funcionando exactamente igual (probado con el formulario real después del cambio).
 
+## Máquina de leads inbound — nuevo foco (20/09/2026)
+- [x] **Bloque 1: captura de lead de fricción mínima** — landing rediseñada como flujo de 3 pasos (edad, cobertura actual, WhatsApp obligatorio), scoring rediseñado para medir intención en vez de cantidad de formulario completado (ver `docs/scoring.md`). 36 tests automáticos. Probado de punta a punta **tres veces**: contra la función desplegada por curl, simulando taps reales en el navegador local, y desde la URL pública de producción — en los tres casos: lead guardado con score 80/`contactar_ahora` y alerta de Telegram confirmada por el usuario. Datos de prueba borrados en cada caso.
+- [ ] Bloque 2: motor de contenido V1 (tabla `content_pieces` + primera tanda real de ideas/guiones/CTAs)
+- [ ] Meta Lead Ads: diseño del formulario corto + infraestructura de webhook (análisis prioritario, sin pautar)
+- [ ] WhatsApp Business Cloud API como canal de conversación (futuro cercano)
+- [ ] Flujo guiado por botones para Instagram (máx. 2-3 preguntas) una vez que Meta apruebe el acceso
+
 ## Fase 0 — Fundaciones
 - [x] Estructura del repositorio
 - [x] README completo
