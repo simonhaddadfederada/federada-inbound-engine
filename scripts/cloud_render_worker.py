@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 from render_reel_asset import render_from_spec  # noqa: E402
 from render_post_asset import render_post, render_story  # noqa: E402
 from render_carousel_asset import render_slide  # noqa: E402
+from auto_beats import generate_beats_from_script  # noqa: E402
 
 MAX_ATTEMPTS = 3
 
@@ -214,10 +215,25 @@ def process_one(supabase_url, service_key, bot_token, chat_id):
         return True
 
     render_spec = piece.get("render_spec")
+    if not render_spec and fmt == "reel":
+        # Bloque 17: guion -> beats automático, determinístico (sin LLM
+        # nuevo, sin secret nuevo) a partir de hook/script/cta ya
+        # aprobados por content-generator. Se persiste en render_spec
+        # para que quede auditable, no solo usado al vuelo.
+        print("Sin render_spec — generando beats automáticamente desde hook/script/cta...")
+        render_spec = generate_beats_from_script(
+            piece["hook"], piece["script"], piece["cta"], piece.get("keyword"),
+        )
+        rest_request(
+            "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
+            body={"render_spec": render_spec},
+        )
+        print(f"render_spec generado: {len(render_spec['beats'])} beats.")
+
     if not render_spec:
         rest_request(
             "PATCH", f"content_pieces?id=eq.{piece_id}", supabase_url, service_key,
-            body={"status": "render_failed", "last_render_error": "Falta render_spec (beats/cta/música) para esta pieza."},
+            body={"status": "render_failed", "last_render_error": "Falta render_spec para esta pieza (formato sin auto-beats)."},
         )
         print("Falta render_spec — marcado render_failed (no se inventa un guion).")
         return True
