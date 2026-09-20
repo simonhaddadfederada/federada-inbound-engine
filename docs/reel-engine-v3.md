@@ -21,33 +21,35 @@
   convierte mejor — se guarda por content_piece, junto con
   `parent_content_piece_id` cuando deriva de una pieza original.
 
-## Audio — investigado, NO contratado todavía
+## Audio — decidido y en producción (20/09/2026)
 
-### Voz en off
+### Voz en off — ElevenLabs "Melanie", plan Starter (USD 6/mes)
 
-Probé la opción gratis del sistema (`say` de macOS) — **no sirve**: no
-tiene ninguna voz con acento argentino (solo España/México) y sí sería
-necesario un tono neutro/artificial, lejos de "natural rioplatense".
+Historial real de la decisión, en orden:
 
-**Recomendación**: Azure AI Speech, voces neuronales dedicadas
-**`es-AR-ElenaNeural`** (mujer) y **`es-AR-TomasNeural`** (hombre) — acento
-argentino real, calidad neuronal moderna.
+1. `say` de macOS (gratis): descartado — sin acento argentino.
+2. Azure AI Speech (`es-AR-ElenaNeural`/`TomasNeural`, ~USD 0/mes a
+   nuestro volumen dentro del free tier): funcionó técnicamente
+   (probado con audio real), pero Simón lo escuchó y le pareció
+   **demasiado robótico**, no suena naturalmente argentino.
+3. ElevenLabs plan **Free**: probado con las voces de la biblioteca
+   comunitaria (Agustín, Melanie, acento argentino real) — **bloqueado**:
+   la propia API devuelve `"Free users cannot use library voices via the
+   API. Please upgrade your subscription."` (comprobado con una llamada
+   real, no documentación).
+4. ElevenLabs plan **Starter (USD 6/mes, autorizado y contratado por
+   Simón)**: desbloquea las voces de biblioteca vía API. Se generaron
+   Agustín y Melanie con el mismo guion real — **Simón eligió Melanie**
+   ("Ecommerce Voice", acento argentino, voice_id `bN1bDXgDIGX5lw0rtY2B`).
 
-- **Costo**: USD 16 por millón de caracteres (voces Neural estándar).
-  Azure da **500.000 caracteres gratis por mes** de forma continua.
-- **Costo por Reel**: un guion de voz de ~150-250 caracteres cuesta
-  **menos de USD 0.005** (medio centavo) — dentro del free tier siempre.
-- **Costo mensual estimado a nuestra cadencia** (1-2 reels/día ≈
-  30-60/mes × ~200 caracteres): ~6.000-12.000 caracteres/mes — **muy por
-  debajo del free tier, esencialmente USD 0/mes** salvo que subamos el
-  volumen en un orden de magnitud.
-- Alternativa de mayor naturalidad conversacional: **ElevenLabs** (sin
-  acento argentino específico, planes mensuales desde ~USD 5, no tiene
-  sentido a nuestro volumen tan chico frente al pago-por-uso de Azure).
+**Sincronización real**: se usa el endpoint `with-timestamps` de
+ElevenLabs, que devuelve el tiempo exacto de cada carácter sintetizado.
+`scripts/render_reel_asset.py` agrupa esos caracteres en palabras y arma
+la duración real de cada beat a partir de ahí — nunca un tiempo inventado.
 
-**No creé la cuenta ni cargué nada — necesito tu autorización** para dar
-de alta Azure (aunque el costo real esperado sea prácticamente cero,
-sigue siendo crear una cuenta con un método de pago cargado).
+**Costo real**: a nuestra cadencia (~6.000-12.000 caracteres/mes),
+sobra margen dentro de los 30.000 caracteres/mes que incluye el plan
+Starter — no se espera pagar de más.
 
 ### Música de fondo
 

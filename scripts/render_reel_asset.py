@@ -1,11 +1,12 @@
 """Reel Engine V3.1 — como V3, pero la duración de cada beat la marca la
-VOZ REAL (Azure AI Speech, es-AR-ElenaNeural), no un número inventado.
+VOZ REAL (ElevenLabs, voz "Melanie" — es-AR), no un número inventado.
 
 Cada beat trae su propio texto hablado. Se sintetiza el guion completo en
-UNA sola llamada (prosodia natural, sin cortes raros entre frases) y se
-usan los eventos de "word boundary" del SDK de Azure para saber
-EXACTAMENTE cuándo se dice cada palabra — de ahí se calcula cuánto dura
-en pantalla cada beat. Nada de sincronización adivinada.
+UNA sola llamada (prosodia natural, sin cortes raros entre frases) al
+endpoint with-timestamps de ElevenLabs, que devuelve el tiempo exacto de
+cada CARÁCTER — se agrupan en palabras (separando por espacios) para
+saber cuándo se dice cada una, y de ahí sale cuánto dura en pantalla
+cada beat. Nada de sincronización adivinada.
 
 Reglas del motor (heredadas de V3, ver docs/reel-engine-v3.md):
 - beats de 1-3s con composición distinta cada uno;
@@ -13,19 +14,24 @@ Reglas del motor (heredadas de V3, ver docs/reel-engine-v3.md):
 - texto en pantalla = solo el concepto corto de cada beat, nunca la
   transcripción completa (evita subtítulo-pared-de-texto).
 
-Requiere: Pillow, imageio-ffmpeg, azure-cognitiveservices-speech (todos
-instalables por pip). Necesita AZURE_SPEECH_KEY/AZURE_SPEECH_REGION.
+Requiere: Pillow, imageio-ffmpeg (instalables por pip). Necesita
+ELEVENLABS_API_KEY (plan Starter — el free no permite usar voces de la
+biblioteca vía API, verificado con una llamada real).
 """
 
 import os
 import re
+import json
+import base64
 import math
 import shutil
 import subprocess
 import tempfile
+import urllib.request
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import imageio_ffmpeg
-import azure.cognitiveservices.speech as speechsdk
+
+MELANIE_VOICE_ID = "bN1bDXgDIGX5lw0rtY2B"  # ElevenLabs, "Melanie - Ecommerce Voice", es-AR
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_DIR = os.path.join(REPO_ROOT, "assets", "fonts")
@@ -61,32 +67,50 @@ def _load_env():
     return env
 
 
-def synthesize_with_timing(full_text: str, voice: str, out_wav_path: str):
-    """Sintetiza full_text con Azure y devuelve la lista de palabras reales
-    (sin tokens de puntuación sueltos) con su offset/duración exactos."""
+def synthesize_with_timing(full_text: str, voice_id: str, out_audio_path: str):
+    """Sintetiza full_text con ElevenLabs (with-timestamps) y devuelve la
+    lista de palabras reales con su offset/duración exactos, reconstruidas
+    a partir del timing por caracter que da la API."""
     env = _load_env()
-    speech_config = speechsdk.SpeechConfig(
-        subscription=env["AZURE_SPEECH_KEY"], region=env["AZURE_SPEECH_REGION"]
+    key = env["ELEVENLABS_API_KEY"]
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
+    body = json.dumps({"text": full_text, "model_id": "eleven_multilingual_v2"}).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body, method="POST",
+        headers={"xi-api-key": key, "Content-Type": "application/json"},
     )
-    speech_config.speech_synthesis_voice_name = voice
-    audio_config = speechsdk.audio.AudioOutputConfig(filename=out_wav_path)
-    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"ElevenLabs no pudo sintetizar ({e.code}): {e.read().decode()}")
 
-    boundaries = []
+    audio_bytes = base64.b64decode(data["audio_base64"])
+    with open(out_audio_path, "wb") as f:
+        f.write(audio_bytes)
 
-    def on_word_boundary(evt):
-        boundaries.append({
-            "text": evt.text,
-            "start_ms": evt.audio_offset / 10000,
-            "duration_ms": evt.duration.total_seconds() * 1000,
-        })
+    align = data["alignment"]
+    chars = align["characters"]
+    starts = align["character_start_times_seconds"]
+    ends = align["character_end_times_seconds"]
 
-    synthesizer.synthesis_word_boundary.connect(on_word_boundary)
-    result = synthesizer.speak_text_async(full_text).get()
-    if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
-        raise RuntimeError(f"Azure TTS no pudo sintetizar: {result.reason} — {result.cancellation_details}")
+    words = []
+    current, word_start, word_end = "", None, None
+    for ch, s, e in zip(chars, starts, ends):
+        if ch.strip() == "":
+            if current:
+                words.append({"text": current, "start_ms": word_start * 1000, "duration_ms": (word_end - word_start) * 1000})
+                current, word_start, word_end = "", None, None
+            continue
+        if word_start is None:
+            word_start = s
+        current += ch
+        word_end = e
+    if current:
+        words.append({"text": current, "start_ms": word_start * 1000, "duration_ms": (word_end - word_start) * 1000})
 
-    real_words = [b for b in boundaries if not PUNCT_ONLY.fullmatch(b["text"])]
+    real_words = [w for w in words if not PUNCT_ONLY.fullmatch(w["text"])]
     return real_words
 
 
@@ -244,12 +268,12 @@ def fit_font(draw, text, max_width, start_size, weight="Black", min_size=48, ste
     return f, wrap_text(draw, text, f, max_width), min_size
 
 
-def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice="es-AR-ElenaNeural"):
+def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_id=MELANIE_VOICE_ID):
     # 1) Sintetizar el guion completo y repartir timing real por beat.
     full_script = ". ".join(b.get("spoken", b.get("text", "")) for b in beats)
     tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
-    wav_path = os.path.join(tmp_dir, "voice.wav")
-    word_timings = synthesize_with_timing(full_script, voice, wav_path)
+    audio_path = os.path.join(tmp_dir, "voice.mp3")
+    word_timings = synthesize_with_timing(full_script, voice_id, audio_path)
     beats = assign_beat_timing(beats, word_timings)
 
     total_duration = sum(b["duration"] for b in beats)
@@ -387,7 +411,7 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice="e
         cmd_mux = [
             ffmpeg_bin, "-y",
             "-i", silent_path,
-            "-i", wav_path,
+            "-i", audio_path,
             "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
             "-map", "0:v:0", "-map", "1:a:0",
             "-shortest", "-movflags", "+faststart",
