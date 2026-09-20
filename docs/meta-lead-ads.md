@@ -34,25 +34,38 @@ Cuando crees el formulario en Ads Manager, usá estas 3 preguntas — nada más:
 `0010_meta_ads_atribucion.sql`) — permite más adelante comparar
 "Anuncio X → N leads → M ventas" por anuncio real.
 
-## Qué falta para que traiga leads reales
+## ⚠️ Corrección importante: el flujo NO está completo sin META_PAGE_ACCESS_TOKEN
 
-`META_PAGE_ACCESS_TOKEN` (permiso `leads_retrieval` sobre la Página). Sin
-esto, el webhook **igual guarda el lead con la atribución del anuncio**
-(para no perderla) pero sin teléfono, y la alerta de Telegram dice
-explícitamente que hay que revisarlo a mano en Ads Manager — no se
-inventa un dato que no tenemos.
+El bloque anterior dijo "el webhook guarda cualquier lead aunque falte el
+token" — eso es cierto pero **engañoso si se lee como "el flujo
+funciona"**. Aclarado en 3 pasos separados, porque son 3 cosas distintas:
+
+| Paso | Qué es | Estado sin `META_PAGE_ACCESS_TOKEN` |
+|---|---|---|
+| **A. Recibir el evento webhook** | Meta nos avisa "alguien completó un formulario" | ✅ Funciona — probado (🟡 con payload simulado, ver abajo) |
+| **B. Obtener el `leadgen_id`** | Viene incluido en el mismo evento del paso A, no requiere ningún llamado extra | ✅ Funciona — es un dato del payload, no de la Graph API |
+| **C. Obtener los datos reales del formulario** (teléfono, rango etario, cobertura, y cualquier otro `field_data`) | Requiere un llamado aparte a la Graph API (`GET /{leadgen_id}`) con un **Page Access Token con permiso `leads_retrieval`** | ❌ **Bloqueado.** Sin esto NO tenemos el teléfono ni ningún dato de contacto. |
+
+**Consecuencia concreta**: hoy, si llegara un lead real de Meta Ads, se
+guardaría una fila en `leads` con la atribución del anuncio (para no
+perderla) pero **sin teléfono ni ningún dato de contacto** — no es un
+lead que Simón pueda usar para vender, es solo un aviso de "pasó algo,
+andá a revisarlo a mano en Ads Manager". El paso C es el que falta para
+que esto sea un lead de verdad.
 
 ## Estado de las pruebas (nomenclatura pedida)
 
-- 🟡 **Firma HMAC + parseo del webhook**: probado con un payload simulado,
-  firmado de forma independiente (Python), con la forma exacta que
-  documenta Meta para el campo `leadgen`. Confirmado: firma inválida
-  rechaza (401), payload válido guarda el lead con la atribución
+- 🟡 **Pasos A + B (recibir evento + leadgen_id) y firma HMAC**: probado
+  con un payload simulado, firmado de forma independiente (Python), con
+  la forma exacta que documenta Meta para el campo `leadgen` — **no es
+  un lead real ni se usó la herramienta oficial de Meta**. Confirmado:
+  firma inválida rechaza (401), payload válido guarda la atribución
   correcta, reintento duplicado se ignora, alerta de Telegram con la
-  línea "Anuncio: ..." confirmada por Simón. **No es un lead real.**
-- ❌ **Recuperar las respuestas reales del formulario (Graph API)**:
-  bloqueado — no existe `META_PAGE_ACCESS_TOKEN` todavía.
-- ❌ **Lead Ads Testing Tool oficial de Meta**: no se usó en este bloque
+  línea "Anuncio: ..." confirmada por Simón.
+- ❌ **Paso C (datos reales del formulario vía Graph API)**: bloqueado —
+  no existe `META_PAGE_ACCESS_TOKEN` todavía. Este paso nunca se probó,
+  ni simulado ni real, porque no hay token con el que probarlo.
+- ❌ **Lead Ads Testing Tool oficial de Meta**: no se usó todavía
   (requiere sesión logueada de Simón en developers.facebook.com). Pasos
   para cuando quieras probarlo vos: Meta for Developers → tu app → tu
   Página → "Lead Ads Testing Tool" → elegís la Página y el formulario (o
