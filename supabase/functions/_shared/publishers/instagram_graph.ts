@@ -69,6 +69,100 @@ export async function publishContainer(
   );
 }
 
+// El HTTP 400 de la primera publicación real (20/09/2026) fue transitorio:
+// un reintento manual segundos después funcionó sin cambiar nada. Esta
+// función reintenta publishContainer con backoff antes de darlo por
+// fallado de verdad. `delayImpl` es inyectable para no esperar de verdad
+// en los tests.
+export async function publishContainerWithRetry(
+  igUserId: string,
+  accessToken: string,
+  containerId: string,
+  fetchImpl: typeof fetch = fetch,
+  maxAttempts = 3,
+  delayImpl: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<GraphResult> {
+  let lastError = "sin intentos";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await publishContainer(igUserId, accessToken, containerId, fetchImpl);
+    if (result.ok) return result;
+    lastError = result.error;
+    if (attempt < maxAttempts) {
+      await delayImpl(attempt * 1000); // backoff simple: 1s, 2s, ...
+    }
+  }
+  return { ok: false, error: lastError };
+}
+
+export interface MediaDetails {
+  permalink: string;
+  timestamp: string;
+}
+
+export type MediaDetailsResult =
+  | { ok: true; details: MediaDetails }
+  | { ok: false; error: string };
+
+export async function getMediaDetails(
+  mediaId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<MediaDetailsResult> {
+  try {
+    const url = `${GRAPH_BASE}/${mediaId}?fields=permalink,timestamp&access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetchImpl(url);
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, error: json.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, details: { permalink: json.permalink, timestamp: json.timestamp } };
+  } catch (err) {
+    return { ok: false, error: `Error de red: ${String(err)}` };
+  }
+}
+
+export interface MediaInsights {
+  reach?: number;
+  saved?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+}
+
+export type InsightsResult =
+  | { ok: true; insights: MediaInsights }
+  | { ok: false; error: string };
+
+// impressions no se pide: Meta no la soporta para media_product_type FEED
+// (confirmado con un error real el 20/09/2026) — no se inventa ese dato.
+export async function getMediaInsights(
+  mediaId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<InsightsResult> {
+  try {
+    const url =
+      `${GRAPH_BASE}/${mediaId}/insights?metric=reach,saved,likes,comments,shares&access_token=${
+        encodeURIComponent(accessToken)
+      }`;
+    const res = await fetchImpl(url);
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, error: json.error?.message ?? `HTTP ${res.status}` };
+    }
+    const insights: MediaInsights = {};
+    for (const metric of json.data ?? []) {
+      const value = metric.values?.[0]?.value;
+      if (typeof value === "number" && metric.name in { reach: 1, saved: 1, likes: 1, comments: 1, shares: 1 }) {
+        (insights as Record<string, number>)[metric.name] = value;
+      }
+    }
+    return { ok: true, insights };
+  } catch (err) {
+    return { ok: false, error: `Error de red: ${String(err)}` };
+  }
+}
+
 export type RefreshResult =
   | { ok: true; accessToken: string; expiresInSeconds: number }
   | { ok: false; error: string };

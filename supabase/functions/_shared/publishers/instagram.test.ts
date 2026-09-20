@@ -35,13 +35,25 @@ Deno.test("publishInstagramPost/Story con asset pero sin credenciales quedan blo
   if (post.status === "blocked") assertStringIncludes(post.reason, "platform_tokens");
 });
 
-Deno.test("carousel y reel siguen bloqueados, pero por falta de assets multiples/video, no por permiso", async () => {
+Deno.test("carousel bloqueado por falta de carousel_assets, no por permiso", async () => {
   const carousel = await publishInstagramCarousel(BASE, noCredentials);
-  const reel = await publishInstagramReel(BASE, noCredentials);
   assertEquals(carousel.status, "blocked");
+  if (carousel.status === "blocked") assertStringIncludes(carousel.reason, "carousel_assets");
+});
+
+Deno.test("reel bloqueado por falta de video, no por permiso", async () => {
+  const reel = await publishInstagramReel(BASE, noCredentials);
   assertEquals(reel.status, "blocked");
-  if (carousel.status === "blocked") assertStringIncludes(carousel.reason, "varias imágenes");
   if (reel.status === "blocked") assertStringIncludes(reel.reason, "video");
+});
+
+Deno.test("carousel con assets pero sin autorizacion real queda bloqueado explicitamente", async () => {
+  const result = await publishInstagramCarousel(
+    { ...BASE, format: "carousel", carouselAssets: ["a", "b", "c"] },
+    noCredentials,
+  );
+  assertEquals(result.status, "blocked");
+  if (result.status === "blocked") assertStringIncludes(result.reason, "no se autorizó");
 });
 
 Deno.test("publisherFor devuelve el adapter correcto segun el formato", () => {

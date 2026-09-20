@@ -22,8 +22,11 @@ import { scheduledAtFor, type ContentFormat, type SlotTimes } from "../_shared/s
 const LANDING_BASE_URL = Deno.env.get("LANDING_BASE_URL") ??
   "https://simonhaddadfederada.github.io/federada-inbound-engine/";
 
+// Meta no permite un link sticker clickeable en stories publicadas por API
+// (verificado contra documentación oficial) — todos los formatos usan el
+// mismo mecanismo real: palabra clave por DM/respuesta, Simón sigue el hilo.
 const CAPTURE_MECHANISM_BY_FORMAT: Record<ContentFormat, string> = {
-  story: "Link directo en el sticker de la historia (atribución automática)",
+  story: "Respuesta nativa a la historia (DM) → Simón responde personalmente y comparte el link atribuido",
   reel: "Palabra clave por DM → Simón responde personalmente y comparte el link atribuido",
   carousel: "Palabra clave por comentario → Simón responde por DM y comparte el link atribuido",
   post: "Palabra clave por comentario/DM → Simón responde y comparte el link atribuido",
@@ -286,14 +289,16 @@ Necesito cubrir ${daysNeeded} día(s) más de contenido con esta cadencia diaria
 - ${config.posts_per_week} post(s) por semana
 
 Reglas de CTA por formato (importante, no las mezcles):
-- "story": el CTA SIEMPRE tiene que invitar a deslizar/tocar el link de la
-  historia (ej: "Deslizá el link de esta historia..."), NUNCA pedir que
-  escriban una palabra por DM — el campo "keyword" va en null.
-- "reel"/"carousel"/"post": Instagram no permite links en el texto, así que
-  el CTA pide una palabra clave por DM o comentario (ej: "Escribime PLAN",
-  "Comentá CARTILLA"). El campo "keyword" tiene que ser EXACTAMENTE esa
-  palabra, en MAYÚSCULAS y sin tildes, igual a como aparece en el texto
-  del CTA — nunca una palabra distinta ni en minúsculas.
+- TODOS los formatos ("reel", "carousel", "post" y también "story"): la
+  API de Meta NO permite agregar un link sticker/clickeable a una story
+  publicada por API (verificado contra documentación oficial — no
+  asumas lo contrario), así que ningún formato puede prometer un link
+  tocable. El CTA siempre pide una palabra clave por DM o por respuesta
+  al contenido (ej: "Escribime PLAN", "Comentá CARTILLA", "Respondé esta
+  historia con APORTES") — NUNCA "deslizá el link" ni "tocá el link".
+  El campo "keyword" tiene que ser EXACTAMENTE esa palabra, en MAYÚSCULAS
+  y sin tildes, igual a como aparece en el texto del CTA — nunca una
+  palabra distinta ni en minúsculas.
 
 "theme" tiene que ser snake_case simple, sin tildes ni espacios (se usa en una URL).
 

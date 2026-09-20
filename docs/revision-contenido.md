@@ -27,14 +27,21 @@ Cada fila ya tiene su propio link armado en `landing_url`, con el formato:
 https://simonhaddadfederada.github.io/federada-inbound-engine/?source=instagram&content=<slug-de-la-pieza>
 ```
 
-- **Para historias**: pegá ese link directo en el sticker de "Link" de la
-  historia. La persona lo toca, completa los 3 pasos, y el lead va a
-  quedar asociado automáticamente a esa historia.
-- **Para reels, carruseles y posts**: Instagram no permite poner un link
-  clickeable en el texto de esas publicaciones. Ahí la persona te va a
-  escribir la palabra clave (`keyword`) por DM o comentario — cuando te
-  escriba, mandale vos ese mismo `landing_url` por privado. Así, aunque
-  el primer contacto sea manual, el lead que complete el formulario
+- **Si publicás vos la story a mano desde la app de Instagram**: pegale
+  el sticker de "Link" con este `landing_url` — ahí sí funciona, cero
+  fricción para la persona. Esto es una función nativa de la app, no de
+  la API.
+- **Si la publica el sistema automáticamente** (cuando `auto_publish`
+  esté en `true`): **el link sticker NO se puede agregar por API** —
+  confirmado contra la documentación oficial de Meta, no es algo que
+  podamos programar. Por eso el `cta` de las stories pide una palabra
+  clave por respuesta ("Respondé esta historia con APORTES"), igual que
+  reels/carruseles/posts — cuando te escriban, mandales vos el
+  `landing_url` por privado.
+- **Para reels, carruseles y posts** (siempre, sea manual o automático):
+  Instagram no permite poner un link clickeable en el texto. La persona
+  te escribe la palabra clave (`keyword`) por DM o comentario — mandale
+  vos ese `landing_url` por privado. El lead que complete el formulario
   igual queda asociado a la pieza correcta.
 
 ## Cómo se ve la atribución cuando llega el lead

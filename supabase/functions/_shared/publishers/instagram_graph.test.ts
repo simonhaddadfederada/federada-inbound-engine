@@ -1,5 +1,13 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { createImageContainer, createStoryContainer, publishContainer, refreshLongLivedToken } from "./instagram_graph.ts";
+import {
+  createImageContainer,
+  createStoryContainer,
+  publishContainer,
+  publishContainerWithRetry,
+  refreshLongLivedToken,
+} from "./instagram_graph.ts";
+
+const noDelay = () => Promise.resolve();
 
 function fakeFetch(response: unknown, ok = true, status = 200): typeof fetch {
   return (() => Promise.resolve(new Response(JSON.stringify(response), { status: ok ? status : 400 }))) as typeof fetch;
@@ -49,6 +57,34 @@ Deno.test("refreshLongLivedToken devuelve el token nuevo y su duracion", async (
     fakeFetch({ access_token: "new-token", token_type: "bearer", expires_in: 5184000 }),
   );
   assertEquals(result, { ok: true, accessToken: "new-token", expiresInSeconds: 5184000 });
+});
+
+Deno.test("publishContainerWithRetry reintenta un error transitorio y termina publicando", async () => {
+  let calls = 0;
+  const flakyFetch = (() => {
+    calls++;
+    if (calls < 2) {
+      return Promise.resolve(new Response(JSON.stringify({ error: { message: "transitorio" } }), { status: 400 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({ id: "media1" }), { status: 200 }));
+  }) as typeof fetch;
+
+  const result = await publishContainerWithRetry("ig1", "tok", "container1", flakyFetch, 3, noDelay);
+  assertEquals(result, { ok: true, id: "media1" });
+  assertEquals(calls, 2);
+});
+
+Deno.test("publishContainerWithRetry se rinde despues de maxAttempts y devuelve el ultimo error", async () => {
+  let calls = 0;
+  const alwaysFails = (() => {
+    calls++;
+    return Promise.resolve(new Response(JSON.stringify({ error: { message: "sigue fallando" } }), { status: 400 }));
+  }) as typeof fetch;
+
+  const result = await publishContainerWithRetry("ig1", "tok", "container1", alwaysFails, 3, noDelay);
+  assertEquals(result.ok, false);
+  if (!result.ok) assertEquals(result.error, "sigue fallando");
+  assertEquals(calls, 3);
 });
 
 Deno.test("refreshLongLivedToken devuelve error legible si Meta lo rechaza", async () => {

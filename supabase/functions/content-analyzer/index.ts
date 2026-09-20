@@ -26,8 +26,20 @@ interface PerformanceRow {
   format: string;
   theme: string | null;
   status: string;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  saves: number | null;
+  shares: number | null;
   leads_total: number;
   leads_calificados: number;
+}
+
+// Tasa útil SOLO cuando hay denominador real — nunca se inventa un % con
+// reach=0/null (evita un "100%" falso o una división por cero silenciosa).
+function leadsPerReach(row: PerformanceRow): number | null {
+  if (!row.reach || row.reach <= 0) return null;
+  return Math.round((row.leads_total / row.reach) * 1000) / 1000;
 }
 
 Deno.serve(async (req) => {
@@ -62,7 +74,10 @@ Deno.serve(async (req) => {
   }
 
   // KPI principal: LEADS_GENERADOS, no views/likes (ver principio central del bloque).
-  const ranked = [...rows].sort((a, b) => b.leads_total - a.leads_total);
+  // leads_per_reach es informativo (solo cuando reach > 0) — el orden sigue siendo por leads.
+  const ranked = [...rows]
+    .map((r) => ({ ...r, leads_per_reach: leadsPerReach(r) }))
+    .sort((a, b) => b.leads_total - a.leads_total);
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
@@ -101,9 +116,18 @@ Deno.serve(async (req) => {
   }
 
   const summary = ranked
-    .map((r) =>
-      `PIEZA ${r.slug}\nformato: ${r.format}\ntema: ${r.theme ?? "sin tema"}\nleads: ${r.leads_total}\nleads_calificados: ${r.leads_calificados}`
-    )
+    .map((r) => {
+      const lines = [
+        `PIEZA ${r.slug}`,
+        `formato: ${r.format}`,
+        `tema: ${r.theme ?? "sin tema"}`,
+        `leads: ${r.leads_total}`,
+        `leads_calificados: ${r.leads_calificados}`,
+      ];
+      if (r.reach !== null) lines.push(`reach: ${r.reach}`);
+      if (r.leads_per_reach !== null) lines.push(`leads_por_reach: ${r.leads_per_reach}`);
+      return lines.join("\n");
+    })
     .join("\n\n");
 
   const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
