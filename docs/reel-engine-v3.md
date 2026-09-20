@@ -81,14 +81,34 @@ default). Mezcla real con `ffmpeg` en `mix_voice_and_music()`:
 
 - `sidechaincompress`: la música se atenúa automáticamente cuando
   Melanie habla (ducking real, no un volumen fijo).
-- Volumen base de música reducido (~45% después del ducking) para que
-  nunca compita con la voz.
+- Volumen base de música después del ducking: **0.60** (subido desde
+  0.45 a pedido de Simón — se percibe más presente sin competir con la
+  voz, ducking/fades/normalización sin tocar).
 - `afade` de entrada/salida cortos (0.25s / 0.5s).
 - `loudnorm` (integrated loudness -16 LUFS, true peak -1.5 dB) para
   normalizar y evitar clipping en la salida final.
 
-**Probado de punta a punta**: Reel real de 20.4s, video H.264 + audio
+**Probado de punta a punta**: Reel real de ~19.7s, video H.264 + audio
 AAC mezclado, mostrado a Simón antes de cualquier publicación.
+
+### Duración — hallazgo real sobre el límite del recorte (20/09/2026)
+
+`build_tts_script()` corrigió un bug real: antes se unían los beats con
+`". ".join(...)`, y como cada beat ya termina en su propio signo
+("estás**?**", "médica**.**"), el guion mandado a ElevenLabs quedaba con
+puntuación **doble** ("estás?.", "médica.."), lo que el modelo lee como
+dos pausas seguidas. Corregido (unión simple, sin signos de más) +
+`tail_buffer_ms` bajado de 500 a 250. **Medido con una llamada real
+instrumentada**: con `eleven_v3`/Melanie Enérgica los huecos entre beats
+ya eran casi cero (0.00s) — el motor NO estaba perdiendo tiempo en
+silencios de sobra; casi toda la duración es habla real a un ritmo
+natural (~0.35-0.46s por palabra). El hook (~4.1s) y el CTA (~4.8s) sin
+tocar ya suman ~9s de los ~16s pedidos como objetivo. Bajar de ~20s a
+15-17s manteniendo intacto el guion, los subtítulos, el CTA, el hook y
+sin acelerar la voz no es matemáticamente posible con este contenido —
+requeriría necesariamente tocar alguna de esas partes protegidas. Con
+los ajustes que sí eran seguros (puntuación + buffer) se logró bajar a
+~19.7s.
 
 ## Material visual
 

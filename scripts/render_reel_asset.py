@@ -141,7 +141,19 @@ def synthesize_with_timing(full_text: str, voice_preset: dict, out_audio_path: s
     return real_words
 
 
-def assign_beat_timing(beats, word_timings, tail_buffer_ms=500):
+def build_tts_script(beats):
+    """Arma el texto que se manda a ElevenLabs a partir de beat['spoken'].
+    Cada beat ya trae su propio punto final ('.', '?'), así que unirlos con
+    otro separador (como se hacía antes: ". ".join(...)) generaba signos de
+    puntuación DOBLES ("estás?.", "médica..") que ElevenLabs lee como dos
+    pausas seguidas en vez de una — eso, no la voz, era la principal fuente
+    de silencio de más en el V1 de esta mezcla. Acá solo se une con un
+    espacio simple, sin tocar ninguna palabra del guion."""
+    parts = [b.get("spoken", b.get("text", "")).strip() for b in beats]
+    return " ".join(parts)
+
+
+def assign_beat_timing(beats, word_timings, tail_buffer_ms=250):
     """Consume word_timings secuencialmente segun la cantidad de palabras
     de cada beat['text']/beat['spoken'], y fija start_ms/duration_ms reales.
     count_real_words excluye audio tags para que el conteo coincida con
@@ -328,7 +340,7 @@ def mix_voice_and_music(voice_path: str, music_path: str, total_duration: float,
     filter_complex = (
         "[1:a]volume=0.85[music_pre];"
         "[music_pre][0:a]sidechaincompress=threshold=0.02:ratio=15:attack=5:release=350:makeup=1[music_ducked];"
-        "[music_ducked]volume=0.45[music_final];"
+        "[music_ducked]volume=0.60[music_final];"
         "[0:a][music_final]amix=inputs=2:duration=first:weights='1 0.9'[premix];"
         f"[premix]afade=t=in:st=0:d=0.25,afade=t=out:st={fade_out_start:.2f}:d=0.5,"
         "loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
@@ -352,7 +364,7 @@ def mix_voice_and_music(voice_path: str, music_path: str, total_duration: float,
 def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_preset=MELANIE_ENERGICA,
                  music_prompt=None):
     # 1) Sintetizar el guion completo y repartir timing real por beat.
-    full_script = ". ".join(b.get("spoken", b.get("text", "")) for b in beats)
+    full_script = build_tts_script(beats)
     tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
     voice_path = os.path.join(tmp_dir, "voice.mp3")
     word_timings = synthesize_with_timing(full_script, voice_preset, voice_path)
