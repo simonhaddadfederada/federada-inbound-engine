@@ -1,17 +1,20 @@
-// Edge Function: recibe el formulario de la landing page.
+// Edge Function: recibe el formulario de landing de fricción mínima
+// (rango etario, cobertura actual sí/no, WhatsApp obligatorio).
 //
 // Flujo:
 //   1. Valida el payload y el consentimiento (intake.ts).
-//   2. Calcula el score con reglas fijas (scoring.ts) — sin IA.
-//   3. Guarda/actualiza el lead en Postgres (upsert por thread_id si vino).
-//   4. Si el score es CONTACTAR AHORA, manda una alerta por Telegram.
+//   2. Calcula el score con reglas fijas (scoring.ts) — sin IA. Con este
+//      flujo mínimo, todo envío válido llega a "contactar_ahora" (ver
+//      nota en intake.ts / scoring.ts): la fricción baja es el filtro.
+//   3. Guarda/actualiza el lead en Postgres (upsert por teléfono).
+//   4. Avisa por Telegram.
 //
 // Variables de entorno requeridas (se configuran como "secrets" en Supabase,
 // nunca hardcodeadas): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 // TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { countAnswers, scoreLandingPayload, validateLandingPayload, ValidationError } from "../_shared/intake.ts";
+import { scoreLandingPayload, validateLandingPayload, ValidationError } from "../_shared/intake.ts";
 import { formatLeadAlert, sendTelegramAlert } from "../_shared/telegram.ts";
 
 const CORS_HEADERS = {
@@ -58,7 +61,9 @@ Deno.serve(async (req) => {
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const threadId = payload.threadId ?? payload.phone ?? crypto.randomUUID();
+  // El teléfono es obligatorio en este flujo: es el identificador natural
+  // para no duplicar al mismo aspirante si vuelve a mandar el formulario.
+  const threadId = payload.threadId ?? payload.phone;
 
   const { data: lead, error: upsertError } = await supabase
     .from("leads")
@@ -68,15 +73,10 @@ Deno.serve(async (req) => {
         external_thread_id: threadId,
         campaign: payload.campaign ?? null,
         post_ref: payload.postRef ?? null,
-        name: payload.name ?? null,
-        locality: payload.locality ?? null,
-        employment_type: payload.employmentType ?? null,
-        contribution_approx: payload.contributionApprox ?? null,
-        coverage_for: payload.coverageFor ?? null,
-        intent_timeframe: payload.intentTimeframe ?? null,
-        phone: payload.phone ?? null,
+        age_range: payload.ageRange ?? null,
+        has_coverage: payload.hasCoverage ?? null,
+        phone: payload.phone,
         explicit_info_request: true,
-        answers_completed: countAnswers(payload),
         consent: true,
         consent_at: new Date().toISOString(),
         score,

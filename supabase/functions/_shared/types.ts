@@ -1,3 +1,6 @@
+// Tipos usados por canales que sí alcanzan a recolectar más detalle
+// (por ejemplo, una conversación de Instagram ya avanzada, o carga manual
+// del asesor). La landing de fricción mínima NO los pide.
 export type EmploymentType = "dependencia" | "monotributo" | "particular";
 export type CoverageFor = "individual" | "grupo_familiar";
 export type IntentTimeframe =
@@ -5,6 +8,10 @@ export type IntentTimeframe =
   | "1_3_meses"
   | "mas_de_3_meses"
   | "sin_definir";
+
+// Rango etario: la única pregunta de "perfil" que pedimos en la landing,
+// porque se contesta con un solo tap y no exige escribir nada.
+export type AgeRange = "18_25" | "26_35" | "36_45" | "46_mas";
 
 export type SourceChannel =
   | "landing"
@@ -19,15 +26,14 @@ export type SourceChannel =
 
 export type ScoreBand = "frio" | "tibio" | "caliente" | "contactar_ahora";
 
-// Payload que manda el formulario de la landing page.
+// Payload del formulario de landing de fricción mínima: 2 taps + 1 teléfono.
+// El teléfono es obligatorio (es el único canal de retorno posible desde la
+// landing). No se piden nombre, localidad, situación laboral ni aporte acá
+// — eso se conversa después, personalmente.
 export interface LandingFormPayload {
-  name?: string;
-  locality?: string;
-  employmentType?: EmploymentType;
-  contributionApprox?: string;
-  coverageFor?: CoverageFor;
-  intentTimeframe?: IntentTimeframe;
-  phone?: string;
+  ageRange?: AgeRange;
+  hasCoverage?: boolean;
+  phone: string;
   consent: boolean;
   campaign?: string;
   postRef?: string;
@@ -46,6 +52,8 @@ export interface LeadRow {
   contribution_approx: string | null;
   coverage_for: CoverageFor | null;
   intent_timeframe: IntentTimeframe | null;
+  age_range: AgeRange | null;
+  has_coverage: boolean | null;
   phone: string | null;
   explicit_info_request: boolean;
   answers_completed: number;

@@ -3,7 +3,6 @@ import {
   assertThrows,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  countAnswers,
   scoreLandingPayload,
   validateLandingPayload,
   ValidationError,
@@ -11,58 +10,79 @@ import {
 
 Deno.test("rechaza sin consentimiento", () => {
   assertThrows(
-    () => validateLandingPayload({ name: "Ana", consent: false }),
+    () => validateLandingPayload({ phone: "261-555-0000", consent: false }),
     ValidationError,
   );
 });
 
-Deno.test("rechaza sin nombre ni telefono", () => {
+Deno.test("rechaza sin telefono (es obligatorio en la landing minima)", () => {
   assertThrows(
     () => validateLandingPayload({ consent: true }),
     ValidationError,
   );
 });
 
-Deno.test("rechaza employmentType invalido", () => {
+Deno.test("rechaza ageRange invalido", () => {
   assertThrows(
     () =>
       validateLandingPayload({
-        name: "Ana",
+        phone: "261-555-0000",
         consent: true,
-        employmentType: "jubilado", // no es un valor válido
+        ageRange: "50_60", // no es un valor válido
       }),
     ValidationError,
   );
 });
 
-Deno.test("acepta payload minimo valido (solo nombre + consentimiento)", () => {
-  const payload = validateLandingPayload({ name: "Ana", consent: true });
-  assertEquals(payload.name, "Ana");
-  assertEquals(payload.consent, true);
-  assertEquals(countAnswers(payload), 0);
+Deno.test("rechaza hasCoverage que no sea booleano", () => {
+  assertThrows(
+    () =>
+      validateLandingPayload({
+        phone: "261-555-0000",
+        consent: true,
+        hasCoverage: "si",
+      }),
+    ValidationError,
+  );
 });
 
-Deno.test("payload completo calcula CONTACTAR AHORA", () => {
+Deno.test("acepta el payload minimo: solo telefono + consentimiento", () => {
+  const payload = validateLandingPayload({ phone: "261-555-0000", consent: true });
+  assertEquals(payload.phone, "261-555-0000");
+  assertEquals(payload.consent, true);
+  assertEquals(payload.ageRange, undefined);
+  assertEquals(payload.hasCoverage, undefined);
+});
+
+Deno.test("acepta el payload completo de los 3 pasos", () => {
   const payload = validateLandingPayload({
-    name: "Marcos",
-    locality: "Mendoza Capital",
-    employmentType: "dependencia",
-    contributionApprox: "sí, tengo aportes",
-    coverageFor: "grupo_familiar",
-    intentTimeframe: "inmediato",
     phone: "261-555-0000",
     consent: true,
+    ageRange: "26_35",
+    hasCoverage: false,
+    campaign: "reel_aportes",
   });
+  assertEquals(payload.ageRange, "26_35");
+  assertEquals(payload.hasCoverage, false);
+  assertEquals(payload.campaign, "reel_aportes");
+});
 
-  assertEquals(countAnswers(payload), 6);
-
+Deno.test("cualquier envio valido de la landing minima llega a CONTACTAR AHORA", () => {
+  const payload = validateLandingPayload({ phone: "261-555-0000", consent: true });
   const { score, band } = scoreLandingPayload(payload);
-  // 10 (inicio) + 30 (6 respuestas) + 20 (dependencia) + 25 (inmediato) + 15 (telefono) + 10 (pidió info) = 110
-  assertEquals(score, 110);
+  // 20 (inicio) + 20 (pidio contacto) + 40 (dejo telefono) = 80
+  assertEquals(score, 80);
   assertEquals(band, "contactar_ahora");
 });
 
-Deno.test("payload con solo telefono y consentimiento es valido", () => {
-  const payload = validateLandingPayload({ phone: "261-555-1111", consent: true });
-  assertEquals(payload.phone, "261-555-1111");
+Deno.test("el score no cambia si el aspirante contesto ademas edad/cobertura", () => {
+  const payload = validateLandingPayload({
+    phone: "261-555-0000",
+    consent: true,
+    ageRange: "18_25",
+    hasCoverage: true,
+  });
+  const { score } = scoreLandingPayload(payload);
+  // edad y cobertura son informativas, no puntuan todavia (ver scoring.ts)
+  assertEquals(score, 80);
 });

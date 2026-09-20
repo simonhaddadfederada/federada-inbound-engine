@@ -51,6 +51,13 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
+const AGE_RANGE_LABELS: Record<string, string> = {
+  "18_25": "18 a 25",
+  "26_35": "26 a 35",
+  "36_45": "36 a 45",
+  "46_mas": "46 o más",
+};
+
 export function formatLeadAlert(lead: {
   name: string | null;
   locality: string | null;
@@ -59,16 +66,24 @@ export function formatLeadAlert(lead: {
   source_channel: string;
   employment_type: string | null;
   intent_timeframe: string | null;
+  age_range?: string | null;
+  has_coverage?: boolean | null;
 }): string {
   const lines = [
     `🚨 <b>Lead CONTACTAR AHORA</b> (score ${lead.score})`,
     `Nombre: ${lead.name ? escapeHtml(lead.name) : "sin dato"}`,
-    `Localidad: ${lead.locality ? escapeHtml(lead.locality) : "sin dato"}`,
-    `Teléfono: ${lead.phone ? escapeHtml(lead.phone) : "no dejó teléfono"}`,
-    `Situación: ${lead.employment_type ?? "sin dato"}`,
-    `Plazo: ${lead.intent_timeframe ?? "sin dato"}`,
-    `Canal: ${lead.source_channel}`,
+    `WhatsApp: ${lead.phone ? escapeHtml(lead.phone) : "no dejó teléfono"}`,
   ];
+  if (lead.age_range) {
+    lines.push(`Edad: ${AGE_RANGE_LABELS[lead.age_range] ?? lead.age_range}`);
+  }
+  if (lead.has_coverage !== undefined && lead.has_coverage !== null) {
+    lines.push(`Cobertura actual: ${lead.has_coverage ? "Sí" : "No"}`);
+  }
+  if (lead.locality) lines.push(`Localidad: ${escapeHtml(lead.locality)}`);
+  if (lead.employment_type) lines.push(`Situación: ${lead.employment_type}`);
+  if (lead.intent_timeframe) lines.push(`Plazo: ${lead.intent_timeframe}`);
+  lines.push(`Canal: ${lead.source_channel}`);
   return lines.join("\n");
 }
 

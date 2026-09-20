@@ -15,129 +15,206 @@
     --border: #dfe7e3;
   }
   * { box-sizing: border-box; }
-  body {
+  html, body {
     margin: 0;
+    height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--ink);
   }
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    max-width: 480px;
+    margin: 0 auto;
+  }
   header {
-    background: var(--brand);
-    color: #fff;
-    padding: 20px 16px;
+    padding: 24px 20px 12px;
     text-align: center;
   }
-  header h1 { margin: 0 0 6px; font-size: 1.4rem; }
-  header p { margin: 0; opacity: 0.9; font-size: 0.95rem; }
-  main {
-    max-width: 560px;
-    margin: 0 auto;
-    padding: 24px 16px 60px;
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 1.25rem;
+    line-height: 1.3;
   }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
-  }
-  label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 0.92rem; }
-  input[type="text"], input[type="tel"], select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 1rem;
-  }
-  .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
-  .radio-group label {
-    font-weight: 400;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--border);
-    padding: 8px 12px;
-    border-radius: 20px;
+  header p {
     margin: 0;
-    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.9rem;
   }
-  .consent { display: flex; align-items: flex-start; gap: 8px; margin-top: 18px; }
-  .consent input { margin-top: 4px; }
-  .consent label { font-weight: 400; font-size: 0.85rem; color: var(--muted); margin: 0; }
-  button {
+  .progress {
+    display: flex;
+    gap: 6px;
+    padding: 0 20px;
+    margin: 14px 0 4px;
+  }
+  .progress span {
+    height: 5px;
+    flex: 1;
+    border-radius: 3px;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+  .progress span.done { background: var(--brand); }
+  .step-label {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 20px 32px;
+  }
+  .step { display: none; }
+  .step.active { display: block; animation: fade 0.2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .step h2 {
+    font-size: 1.35rem;
+    margin: 0 0 20px;
+    text-align: center;
+  }
+  .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .options.two-col-wide { grid-template-columns: 1fr; }
+  .opt-btn {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 12px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .opt-btn:active,
+  .opt-btn.selected {
+    border-color: var(--brand);
+    background: #eaf5f0;
+  }
+  input[type="tel"] {
+    width: 100%;
+    padding: 16px 14px;
+    font-size: 1.1rem;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  input[type="tel"]:focus { outline: none; border-color: var(--brand); }
+  .cta {
     width: 100%;
     background: var(--brand);
     color: #fff;
     border: none;
-    padding: 14px;
-    border-radius: 8px;
-    font-size: 1.05rem;
+    padding: 17px;
+    border-radius: 12px;
+    font-size: 1.1rem;
     font-weight: 700;
-    margin-top: 20px;
     cursor: pointer;
   }
-  button:hover { background: var(--brand-dark); }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  #status { margin-top: 14px; font-size: 0.95rem; text-align: center; }
-  #status.ok { color: var(--brand-dark); }
-  #status.err { color: #b3261e; }
-  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  .cta:disabled { opacity: 0.5; }
+  .cta:hover:not(:disabled) { background: var(--brand-dark); }
+  .disclaimer {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+  .back-link {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  #done-screen { text-align: center; }
+  #done-screen .big-check {
+    font-size: 3rem;
+    margin-bottom: 8px;
+  }
+  #done-screen h2 { margin-bottom: 8px; }
+  #done-screen p { color: var(--muted); }
+  #error-msg {
+    color: #b3261e;
+    text-align: center;
+    font-size: 0.85rem;
+    margin-top: 10px;
+    min-height: 1em;
+  }
+  footer {
+    text-align: center;
+    padding: 10px 20px 18px;
+  }
+  footer a { color: var(--muted); font-size: 0.78rem; }
 </style>
 </head>
 <body>
-  <header>
-    <h1>¿Querés saber si estás pagando de más por tu cobertura de salud?</h1>
-    <p>Contame tu situación y te escribo yo — sin compromiso.</p>
-  </header>
+  <div class="wrap">
+    <header>
+      <h1>¿Estás pagando de más por tu cobertura de salud?</h1>
+      <p>3 toques y listo. Te escribo yo por WhatsApp.</p>
+    </header>
 
-  <main>
-    <form id="lead-form" class="card">
-      <label for="name">Nombre</label>
-      <input type="text" id="name" name="name" autocomplete="name" required />
+    <div class="progress" id="progress">
+      <span data-step="1"></span>
+      <span data-step="2"></span>
+      <span data-step="3"></span>
+    </div>
+    <div class="step-label" id="step-label">Paso 1 de 3</div>
 
-      <label for="locality">Localidad</label>
-      <input type="text" id="locality" name="locality" placeholder="Ej: Godoy Cruz, Mendoza" autocomplete="address-level2" />
+    <main>
+      <form id="lead-form">
+        <div class="step active" data-step="1">
+          <h2>¿Qué edad tenés?</h2>
+          <div class="options" data-field="ageRange">
+            <button type="button" class="opt-btn" data-value="18_25">18 a 25</button>
+            <button type="button" class="opt-btn" data-value="26_35">26 a 35</button>
+            <button type="button" class="opt-btn" data-value="36_45">36 a 45</button>
+            <button type="button" class="opt-btn" data-value="46_mas">46 o más</button>
+          </div>
+        </div>
 
-      <label>¿Cuál es tu situación?</label>
-      <div class="radio-group">
-        <label><input type="radio" name="employmentType" value="dependencia" /> Relación de dependencia</label>
-        <label><input type="radio" name="employmentType" value="monotributo" /> Monotributo</label>
-        <label><input type="radio" name="employmentType" value="particular" /> Particular</label>
-      </div>
+        <div class="step" data-step="2">
+          <h2>¿Tenés cobertura médica hoy?</h2>
+          <div class="options two-col-wide" data-field="hasCoverage">
+            <button type="button" class="opt-btn" data-value="true">Sí, tengo</button>
+            <button type="button" class="opt-btn" data-value="false">No tengo</button>
+          </div>
+        </div>
 
-      <label for="contributionApprox">¿Sabés cuánto aportás aproximadamente? (opcional)</label>
-      <input type="text" id="contributionApprox" name="contributionApprox" placeholder="Si no lo sabés, dejalo en blanco" />
+        <div class="step" data-step="3">
+          <h2>Dejame tu WhatsApp</h2>
+          <input type="tel" id="phone" inputmode="tel" placeholder="261 555 0000" autocomplete="tel" required />
+          <button type="submit" class="cta" id="submit-btn">Quiero que Simón me escriba</button>
+          <p class="disclaimer">Al enviar, aceptás que te contactemos por WhatsApp para asesorarte. No compartimos tu número con nadie.</p>
+          <p id="error-msg"></p>
+        </div>
 
-      <label>¿Es para vos solo/a o para tu grupo familiar?</label>
-      <div class="radio-group">
-        <label><input type="radio" name="coverageFor" value="individual" /> Individual</label>
-        <label><input type="radio" name="coverageFor" value="grupo_familiar" /> Grupo familiar</label>
-      </div>
+        <div id="done-screen" style="display:none;">
+          <div class="big-check">✅</div>
+          <h2>¡Listo!</h2>
+          <p>En breve te escribo por WhatsApp.</p>
+        </div>
+      </form>
+      <span class="back-link" id="back-link" style="display:none;">← Volver</span>
+    </main>
 
-      <label>¿Para cuándo te gustaría cambiar de cobertura?</label>
-      <select id="intentTimeframe" name="intentTimeframe">
-        <option value="sin_definir" selected>Todavía estoy averiguando</option>
-        <option value="inmediato">Lo antes posible</option>
-        <option value="1_3_meses">En 1 a 3 meses</option>
-        <option value="mas_de_3_meses">Más adelante</option>
-      </select>
-
-      <label for="phone">Teléfono (opcional, solo si querés que te contacte)</label>
-      <input type="tel" id="phone" name="phone" placeholder="261..." autocomplete="tel" />
-      <p class="hint">No compartimos tu teléfono con nadie. Se usa únicamente para que te contacte tu asesor.</p>
-
-      <div class="consent">
-        <input type="checkbox" id="consent" name="consent" required />
-        <label for="consent">Acepto ser contactado/a por un asesor de Federada Salud a partir de estos datos.</label>
-      </div>
-
-      <button type="submit" id="submit-btn">Quiero que me contacten</button>
-      <p id="status" role="status"></p>
-    </form>
-    <p style="text-align:center; font-size:0.8rem; color:var(--muted);">
-      <a href="privacidad.html" style="color:var(--muted);">Política de privacidad</a>
-    </p>
-  </main>
+    <footer>
+      <a href="privacidad.html">Política de privacidad</a>
+    </footer>
+  </div>
 
   <script>
     const ENDPOINT_URL = "https://toqaghiiihlsnohbwddl.supabase.co/functions/v1/intake-landing";
@@ -147,27 +224,69 @@
     const campaign = params.get("utm_campaign") || undefined;
     const postRef = params.get("utm_content") || params.get("post") || undefined;
 
+    const answers = { ageRange: undefined, hasCoverage: undefined };
+    let currentStep = 1;
+    const TOTAL_STEPS = 3;
+
+    const progressEls = document.querySelectorAll("#progress span");
+    const stepLabel = document.getElementById("step-label");
+    const backLink = document.getElementById("back-link");
     const form = document.getElementById("lead-form");
-    const statusEl = document.getElementById("status");
+    const errorMsg = document.getElementById("error-msg");
     const submitBtn = document.getElementById("submit-btn");
+
+    function renderProgress() {
+      progressEls.forEach((el) => {
+        el.classList.toggle("done", Number(el.dataset.step) <= currentStep);
+      });
+      stepLabel.textContent = `Paso ${currentStep} de ${TOTAL_STEPS}`;
+      backLink.style.display = currentStep > 1 ? "block" : "none";
+    }
+
+    function goToStep(n) {
+      document.querySelectorAll(".step").forEach((el) => {
+        el.classList.toggle("active", Number(el.dataset.step) === n);
+      });
+      currentStep = n;
+      renderProgress();
+    }
+
+    // Steps 1 y 2: tocar una opción avanza solo, sin botón "siguiente".
+    document.querySelectorAll(".options").forEach((group) => {
+      const field = group.dataset.field;
+      group.querySelectorAll(".opt-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          group.querySelectorAll(".opt-btn").forEach((b) => b.classList.remove("selected"));
+          btn.classList.add("selected");
+          const raw = btn.dataset.value;
+          answers[field] = raw === "true" ? true : raw === "false" ? false : raw;
+          setTimeout(() => goToStep(currentStep + 1), 150);
+        });
+      });
+    });
+
+    backLink.addEventListener("click", () => {
+      if (currentStep > 1) goToStep(currentStep - 1);
+    });
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      statusEl.textContent = "";
-      statusEl.className = "";
+      errorMsg.textContent = "";
+
+      const phone = document.getElementById("phone").value.trim();
+      if (!phone) {
+        errorMsg.textContent = "Dejanos un WhatsApp para poder escribirte.";
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = "Enviando...";
 
-      const fd = new FormData(form);
       const payload = {
-        name: fd.get("name")?.toString().trim() || undefined,
-        locality: fd.get("locality")?.toString().trim() || undefined,
-        employmentType: fd.get("employmentType") || undefined,
-        contributionApprox: fd.get("contributionApprox")?.toString().trim() || undefined,
-        coverageFor: fd.get("coverageFor") || undefined,
-        intentTimeframe: fd.get("intentTimeframe") || undefined,
-        phone: fd.get("phone")?.toString().trim() || undefined,
-        consent: fd.get("consent") === "on",
+        ageRange: answers.ageRange,
+        hasCoverage: answers.hasCoverage,
+        phone,
+        consent: true,
         campaign,
         postRef,
       };
@@ -177,29 +296,28 @@
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+            authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify(payload),
         });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "No se pudo enviar");
 
-        if (!res.ok) {
-          throw new Error(data.error || "No se pudo enviar el formulario");
-        }
-
-        statusEl.textContent = "¡Listo! En breve te contacto personalmente.";
-        statusEl.className = "ok";
-        form.reset();
+        document.querySelectorAll(".step").forEach((el) => el.classList.remove("active"));
+        document.getElementById("done-screen").style.display = "block";
+        backLink.style.display = "none";
+        document.getElementById("progress").style.display = "none";
+        stepLabel.style.display = "none";
       } catch (err) {
-        statusEl.textContent = "Hubo un problema enviando tus datos. Probá de nuevo en unos minutos.";
-        statusEl.className = "err";
+        errorMsg.textContent = "Hubo un problema. Probá de nuevo en unos minutos.";
         console.error(err);
-      } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = "Quiero que me contacten";
+        submitBtn.textContent = "Quiero que Simón me escriba";
       }
     });
+
+    renderProgress();
   </script>
 </body>
 </html>

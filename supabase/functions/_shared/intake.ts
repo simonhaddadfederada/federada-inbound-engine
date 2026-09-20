@@ -1,19 +1,12 @@
-// Valida y normaliza el payload del formulario de la landing page, y arma
-// el objeto listo para guardar en `leads` + el input para el scoring.
+// Valida y normaliza el payload del formulario de landing de fricción
+// mínima (2 taps + teléfono), y arma el input para el scoring.
 // Separado de index.ts para poder testearlo sin necesitar Supabase real.
 import { computeScore, type ScoringInput } from "./scoring.ts";
-import type { LandingFormPayload } from "./types.ts";
+import type { AgeRange, LandingFormPayload } from "./types.ts";
 
 export class ValidationError extends Error {}
 
-const VALID_EMPLOYMENT = ["dependencia", "monotributo", "particular"];
-const VALID_COVERAGE = ["individual", "grupo_familiar"];
-const VALID_TIMEFRAME = [
-  "inmediato",
-  "1_3_meses",
-  "mas_de_3_meses",
-  "sin_definir",
-];
+const VALID_AGE_RANGES: AgeRange[] = ["18_25", "26_35", "36_45", "46_mas"];
 
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -33,32 +26,24 @@ export function validateLandingPayload(
     );
   }
 
-  if (!nonEmpty(b.name) && !nonEmpty(b.phone)) {
+  if (!nonEmpty(b.phone)) {
     throw new ValidationError(
-      "Se necesita al menos un nombre o un teléfono para registrar el lead",
+      "Falta el WhatsApp/teléfono — es el único dato de contacto de la landing",
     );
   }
 
-  if (b.employmentType !== undefined && !VALID_EMPLOYMENT.includes(String(b.employmentType))) {
-    throw new ValidationError("employmentType inválido");
+  if (b.ageRange !== undefined && !VALID_AGE_RANGES.includes(b.ageRange as AgeRange)) {
+    throw new ValidationError("ageRange inválido");
   }
-  if (b.coverageFor !== undefined && !VALID_COVERAGE.includes(String(b.coverageFor))) {
-    throw new ValidationError("coverageFor inválido");
-  }
-  if (b.intentTimeframe !== undefined && !VALID_TIMEFRAME.includes(String(b.intentTimeframe))) {
-    throw new ValidationError("intentTimeframe inválido");
+
+  if (b.hasCoverage !== undefined && typeof b.hasCoverage !== "boolean") {
+    throw new ValidationError("hasCoverage debe ser true o false");
   }
 
   return {
-    name: nonEmpty(b.name) ? b.name.trim() : undefined,
-    locality: nonEmpty(b.locality) ? b.locality.trim() : undefined,
-    employmentType: b.employmentType as LandingFormPayload["employmentType"],
-    contributionApprox: nonEmpty(b.contributionApprox)
-      ? b.contributionApprox.trim()
-      : undefined,
-    coverageFor: b.coverageFor as LandingFormPayload["coverageFor"],
-    intentTimeframe: b.intentTimeframe as LandingFormPayload["intentTimeframe"],
-    phone: nonEmpty(b.phone) ? b.phone.trim() : undefined,
+    phone: (b.phone as string).trim(),
+    ageRange: b.ageRange as AgeRange | undefined,
+    hasCoverage: b.hasCoverage as boolean | undefined,
     consent: true,
     campaign: nonEmpty(b.campaign) ? b.campaign.trim() : undefined,
     postRef: nonEmpty(b.postRef) ? b.postRef.trim() : undefined,
@@ -66,32 +51,18 @@ export function validateLandingPayload(
   };
 }
 
-// Cuenta cuántos de los campos de calificación "opcionales" fueron
-// contestados (además de nombre, que es obligatorio junto con teléfono).
-export function countAnswers(payload: LandingFormPayload): number {
-  const fields = [
-    payload.locality,
-    payload.employmentType,
-    payload.contributionApprox,
-    payload.coverageFor,
-    payload.intentTimeframe,
-    payload.phone,
-  ];
-  return fields.filter((f) => f !== undefined && f !== "").length;
-}
-
+// El flujo de landing exige teléfono para poder enviarse, y completar los
+// 2 taps + el envío ya es en sí mismo un pedido explícito de contacto. Por
+// diseño, todo envío válido de este formulario mínimo llega a la banda más
+// alta: acá la fricción baja es lo que filtra la intención, no la cantidad
+// de datos pedidos (ver nota en scoring.ts).
 export function scoringInputFromPayload(
-  payload: LandingFormPayload,
+  _payload: LandingFormPayload,
 ): ScoringInput {
   return {
     startedConversation: true,
-    answersCompleted: countAnswers(payload),
-    employmentType: payload.employmentType ?? null,
-    intentTimeframe: payload.intentTimeframe ?? null,
-    hasPhone: nonEmpty(payload.phone),
-    // llenar el formulario de la landing ya es, en sí mismo, un pedido
-    // explícito de información/contacto.
     explicitInfoRequest: true,
+    hasPhone: true,
   };
 }
 

@@ -1,68 +1,73 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { bandForScore, computeScore, SCORE_WEIGHTS } from "./scoring.ts";
 
-Deno.test("lead que solo llena el formulario sin nada más queda FRIO", () => {
+Deno.test("solo dar el primer paso, sin telefono ni pedido explicito, queda FRIO", () => {
   const { score, band } = computeScore({
     startedConversation: true,
-    answersCompleted: 0,
-    hasPhone: false,
     explicitInfoRequest: false,
+    hasPhone: false,
   });
-  // 10 (inicio) -> frio
-  assertEquals(score, 10);
+  assertEquals(score, 20);
   assertEquals(band, "frio");
 });
 
-Deno.test("lead que contesta todo pero sin aportes ni plazo ni telefono llega a CALIENTE solo por completar respuestas", () => {
+Deno.test("dar el primer paso + pedir info sin dejar telefono queda TIBIO", () => {
   const { score, band } = computeScore({
     startedConversation: true,
-    answersCompleted: 6,
-    employmentType: "particular",
-    intentTimeframe: "sin_definir",
-    hasPhone: false,
     explicitInfoRequest: true,
+    hasPhone: false,
   });
-  // 10 (inicio) + 30 (6 respuestas) + 0 + 0 + 0 + 10 (pidió info) = 50
-  assertEquals(score, 50);
-  assertEquals(band, "caliente");
+  // 20 (inicio) + 20 (pidio info) = 40
+  assertEquals(score, 40);
+  assertEquals(band, "tibio");
 });
 
-Deno.test("lead con aportes e intencion inmediata y telefono es CONTACTAR AHORA", () => {
+Deno.test("completar el mini-flujo de landing (siempre con telefono) es CONTACTAR AHORA", () => {
   const { score, band } = computeScore({
     startedConversation: true,
-    answersCompleted: 6,
-    employmentType: "dependencia",
-    intentTimeframe: "inmediato",
-    hasPhone: true,
     explicitInfoRequest: true,
+    hasPhone: true,
   });
-  // 10 + 30 + 20 + 25 + 15 + 10 = 110 (máximo posible)
-  assertEquals(score, 110);
+  // 20 + 20 + 40 = 80 - el flujo de landing no pide mas que esto, y ya
+  // alcanza para la banda mas alta: la friccion baja es la que filtra,
+  // no la cantidad de datos.
+  assertEquals(score, 80);
   assertEquals(band, "contactar_ahora");
 });
 
-Deno.test("lead con aportes e intencion 1 a 3 meses sin telefono queda CALIENTE", () => {
+Deno.test("dejar telefono sin pedir info explicitamente ya es CALIENTE", () => {
   const { score, band } = computeScore({
     startedConversation: true,
-    answersCompleted: 4,
-    employmentType: "monotributo",
-    intentTimeframe: "1_3_meses",
-    hasPhone: false,
     explicitInfoRequest: false,
+    hasPhone: true,
   });
-  // 10 + 20 (4*5) + 20 + 15 = 65
-  assertEquals(score, 65);
+  // 20 + 40 = 60
+  assertEquals(score, 60);
   assertEquals(band, "caliente");
 });
 
-Deno.test("answersCompleted no suma mas alla del maximo contado", () => {
-  const { score } = computeScore({
-    startedConversation: false,
-    answersCompleted: 999,
-    hasPhone: false,
-    explicitInfoRequest: false,
+Deno.test("las senales opcionales (situacion laboral, plazo) suman como bonus", () => {
+  const { score, band } = computeScore({
+    startedConversation: true,
+    explicitInfoRequest: true,
+    hasPhone: true,
+    employmentType: "monotributo",
+    intentTimeframe: "inmediato",
   });
-  assertEquals(score, SCORE_WEIGHTS.maxAnswersCounted * SCORE_WEIGHTS.perAnswerCompleted);
+  // 20 + 20 + 40 + 10 + 10 = 100 (maximo posible)
+  assertEquals(score, 100);
+  assertEquals(band, "contactar_ahora");
+});
+
+Deno.test("empleo particular y plazo sin definir no suman bonus", () => {
+  const { score } = computeScore({
+    startedConversation: true,
+    explicitInfoRequest: false,
+    hasPhone: false,
+    employmentType: "particular",
+    intentTimeframe: "sin_definir",
+  });
+  assertEquals(score, SCORE_WEIGHTS.startedConversation);
 });
 
 Deno.test("bandForScore cubre los limites de cada banda sin huecos", () => {

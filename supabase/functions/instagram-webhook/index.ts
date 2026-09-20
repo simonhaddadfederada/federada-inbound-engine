@@ -22,6 +22,7 @@ import {
   type InstagramWebhookPayload,
 } from "../_shared/instagram_events.ts";
 import { formatInstagramAlert, sendTelegramAlert } from "../_shared/telegram.ts";
+import { computeScore } from "../_shared/scoring.ts";
 
 function textResponse(body: string, status = 200) {
   return new Response(body, { status, headers: { "content-type": "text/plain" } });
@@ -102,6 +103,14 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    // Score real (antes esta función no lo calculaba, y el lead quedaba
+    // con el score=0/frio por defecto sin importar la interacción real).
+    const { score, band } = computeScore({
+      startedConversation: true,
+      explicitInfoRequest: event.matchesKeyword,
+      hasPhone: false, // Instagram no entrega el teléfono del usuario
+    });
+
     const { data: lead, error: upsertError } = await supabase
       .from("leads")
       .upsert(
@@ -113,6 +122,9 @@ Deno.serve(async (req) => {
           notes: `[${event.type}] ${event.text}`,
           consent: true,
           consent_at: new Date().toISOString(),
+          score,
+          score_band: band,
+          status: band === "contactar_ahora" ? "calificado" : "nuevo",
         },
         { onConflict: "source_channel,external_thread_id" },
       )
