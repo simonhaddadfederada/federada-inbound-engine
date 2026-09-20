@@ -4,14 +4,14 @@ Generado al cierre de una sesión de trabajo autónomo explícitamente autorizad
 
 ## Resumen
 
-El sistema **genera, renderiza, publica, mide y analiza** contenido de forma automatizada, con dos piezas reales ya publicadas en Instagram. La generación de assets (Reels/posts/carruseles/Stories) puede correr en GitHub Actions, sin la Mac de Simón — **probado con el código real, en runners y localmente**; falta la confirmación de una corrida verdaderamente headless por un secret mal cargado que solo Simón puede corregir. `AUTO_PUBLISH` sigue en `false`: no se cumple todavía la condición que el propio Simón puso para activarlo (todo corriendo en la nube).
+El sistema **genera, renderiza, publica, mide y analiza** contenido de forma automatizada, con dos piezas reales ya publicadas en Instagram. La generación de assets (posts/carruseles/Stories) ya corre 100% en GitHub Actions, **confirmado con dos corridas reales y programadas, sin ningún proceso local** (Simón podría apagar su Mac ahora mismo y esas corridas seguirían solas). Los Reels son la única excepción: el código es el mismo y funciona (probado localmente con la key real), pero en la nube el secret `ELEVENLABS_API_KEY` está mal cargado — arreglarlo es una acción de un minuto que solo Simón puede hacer. `AUTO_PUBLISH` sigue en `false`: falta esa única pieza para que la condición que el propio Simón puso ("todo corriendo en la nube") sea 100% cierta.
 
 ## Qué funciona hoy, probado de verdad
 
 | Pieza | Estado | Evidencia |
 |---|---|---|
 | Generación de guion/copy (Anthropic) | ✅ cloud, cron diario | `content-generator`, corre sola hace días |
-| Render de posts/carruseles/Stories | ✅ cloud (código probado) | `cloud_render_worker.py`, 14 assets reales subidos a Storage |
+| Render de posts/carruseles/Stories | ✅ cloud, confirmado headless | 2 corridas reales y programadas de GitHub Actions (runs `35539187266`, `35540596353`), sin ningún proceso local — 4 Stories renderizadas y subidas a Storage ahí mismo, URLs públicas verificadas (200 sin auth) |
 | Render de Reels (voz+música+ducking) | 🟡 cloud bloqueado por 1 secret | Funciona localmente con la key real; en GitHub Actions falla por `ELEVENLABS_API_KEY` mal cargado |
 | Storage de assets | ✅ cloud | Bucket `content-assets`, URLs públicas verificadas (200 sin auth) |
 | Publicación en Instagram | ✅ cloud, probado en vivo 2 veces | Post real + Reel real, ambos públicos |

@@ -23,15 +23,21 @@ gateado por `content_config.auto_publish` (todavía `false`).
 el repo público, GitHub Actions cubre el volumen sin costo — se descarta
 Railway/Fly.io sin necesidad de gastar nada, tal como se pidió.
 
-## Qué hace falta verificar en vivo (no alcanza con la teoría)
+## Confirmado en vivo (20/09/2026)
 
-`pip install Pillow imageio-ffmpeg` en un runner `ubuntu-latest` debería
-alcanzar (el mismo paquete que ya se usa local trae un binario de ffmpeg
-precompilado para Linux, no hace falta `apt-get install ffmpeg`) — pero
-esto se confirma recién con una corrida real del workflow, no antes. El
-resultado real de esa corrida (éxito/error, URL del MP4 subido, log
-completo) se deja registrado en el chat, no acá, para no adelantar un
-resultado antes de tenerlo.
+Dos corridas reales, programadas (`schedule`, no disparadas a mano),
+100% headless en un runner `ubuntu-latest` de GitHub Actions —
+verificado con el log real de cada una (runs `35539187266` y
+`35540596353`, ambas `conclusion: success`): `pip install Pillow
+imageio-ffmpeg` alcanza sin instalar nada más (el mismo paquete trae un
+binario de ffmpeg precompilado para Linux), el worker reclamó piezas
+`render_pendiente` reales, las renderizó y las subió a Supabase Storage
+— las URLs públicas devuelven 200 sin autenticación. **Esto prueba que
+el render de posts/carruseles/Stories corre sin ninguna computadora
+local.** Los Reels específicamente siguen bloqueados en la nube por un
+secret de ElevenLabs mal cargado (ver el chat / `FINAL_STATUS.md`) — no
+es un problema de la arquitectura, la misma key funciona perfecto desde
+un entorno donde está bien cargada.
 
 ## Arquitectura
 
