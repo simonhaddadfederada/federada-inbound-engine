@@ -42,6 +42,29 @@ _EMOTION_BY_HOOK_TYPE = {
     "mito": "sorpresa / corrección",
 }
 
+_RECURSO_KEYWORDS = [
+    # (recurso, palabras clave a buscar en hook+theme+script)
+    ("documento", ["aporte", "recibo", "sueldo", "monotributo", "cuota", "categoría"]),
+    ("familia", ["familia", "hijo", "hijos", "pareja", "grupo familiar"]),
+    ("persona_celular", ["celular", "app", "whatsapp", "trámite", "trámites", "escribime", "mensaje"]),
+    ("medico", ["médic", "consultorio", "salud", "cobertura médica", "prestador", "cartilla"]),
+]
+
+
+def _pick_recurso_principal(piece: dict) -> str:
+    """Elige el recurso visual principal por CRITERIO SEMÁNTICO (contenido
+    real de la pieza), no solo por hook_type — texto plano solo si nada
+    del contenido sugiere un recurso más concreto (sigue siendo válido:
+    'texto puro cuando sea la mejor opción', no la opción por defecto)."""
+    text = " ".join([
+        piece.get("hook", ""), piece.get("theme", ""), piece.get("script", ""),
+    ]).lower()
+    for recurso, keywords in _RECURSO_KEYWORDS:
+        if any(kw in text for kw in keywords):
+            return recurso
+    return "texto_puro"
+
+
 _WHY_STOPS_SCROLL = {
     "glow_orbital": "movimiento orgánico cálido — se siente humano, no una placa fija",
     "split_diagonal": "corte diagonal genera tensión visual inmediata, coherente con un hook de alerta",
@@ -77,16 +100,28 @@ def decide_creative_direction(piece: dict) -> dict:
         "carousel": carousel_family,
     }.get(fmt, reel_style)
 
+    recurso_principal = _pick_recurso_principal(piece)
+    medio = (
+        "texto protagonista, sin recurso visual adicional (fue la mejor opción para este contenido)"
+        if recurso_principal == "texto_puro"
+        else f"iconografía propia '{recurso_principal}' como acento visual + texto protagonista"
+    )
+
+    why = _WHY_STOPS_SCROLL.get(layout_style, "composición distinta a la placa genérica")
+    if recurso_principal != "texto_puro":
+        why += f"; el ícono de '{recurso_principal}' da un punto de referencia visual concreto, no solo tipografía"
+
     return {
         "concepto_visual": f"'{theme or hook_type or fmt}' resuelto en un solo golpe visual, sin párrafos",
         "emocion_principal": _EMOTION_BY_HOOK_TYPE.get(hook_type, "interés"),
         "hook_visual": hook,
+        "recurso_principal": recurso_principal,
         "estilo_composicion": layout_style,
-        "medio": "texto protagonista + gráficos/iconografía (sin foto/video real — no contratado)",
+        "medio": medio,
         "jerarquia": "hook -> idea -> CTA, en ese orden, nada compite con el hook",
         "foco_principal": "el hook y el CTA — todo lo demás es soporte",
         "ritmo": "cambio visual cada 2-4s" if fmt == "reel" else "una sola idea por pieza",
         "cta": piece.get("cta", ""),
-        "por_que_frena_scroll": _WHY_STOPS_SCROLL.get(layout_style, "composición distinta a la placa genérica"),
+        "por_que_frena_scroll": why,
         "layout_style": layout_style,
     }

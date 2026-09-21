@@ -30,6 +30,7 @@ import tempfile
 import urllib.request
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import imageio_ffmpeg
+from icon_assets import composite_icon
 
 # Preset de voz definitivo (elegido por Simón, 20/09/2026): Melanie, perfil
 # ENÉRGICA. Reutilizar este dict tal cual para todo Reel nuevo — es la
@@ -343,9 +344,15 @@ REEL_STYLES = {
 }
 
 
-def build_background(progress, beat_index, style="glow_orbital"):
+def build_background(progress, beat_index, style="glow_orbital", icon_key=None):
+    """icon_key (Bloque 19, Creative Director V2 — opt-in, None por
+    defecto): compone un ícono propio (icon_assets.py) como acento grande
+    y sutil, ANTES del recorte Ken Burns, para que se mueva junto con el
+    fondo en vez de quedar pegado a la pantalla."""
     builder = REEL_STYLES.get(style, _canvas_glow_orbital)
     canvas = builder(beat_index)
+    if icon_key:
+        canvas = composite_icon(canvas, icon_key, BG_W * 0.72, BG_H * 0.42, scale=1.7, alpha=26)
 
     zoom = 1.0 + 0.16 * progress
     zw, zh = int(W * zoom), int(H * zoom)
@@ -453,7 +460,7 @@ def mix_voice_and_music(voice_path: str, music_path: str, total_duration: float,
 
 
 def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_preset=MELANIE_ENERGICA,
-                 music_prompt=None, visual_style="glow_orbital"):
+                 music_prompt=None, visual_style="glow_orbital", icon_key=None):
     # 1) Sintetizar el guion completo y repartir timing real por beat.
     full_script = build_tts_script(beats)
     tmp_dir = tempfile.mkdtemp(prefix="reelv31_")
@@ -485,7 +492,7 @@ def render_reel(beats, cta_text, subcta_text, handle_text, output_path, voice_pr
             local_t = t_global - starts[beat_idx]
             local_anim = ease_out_back(min(local_t / 0.3, 1.0)) if local_t < 0.3 else 1.0
 
-            frame = build_background(progress, beat_idx, style=visual_style).convert("RGBA")
+            frame = build_background(progress, beat_idx, style=visual_style, icon_key=icon_key).convert("RGBA")
             overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             odraw = ImageDraw.Draw(overlay)
 
@@ -639,6 +646,7 @@ def render_from_spec(spec: dict, output_path: str):
         voice_preset=MELANIE_ENERGICA,
         music_prompt=spec.get("music_prompt"),
         visual_style=spec.get("visual_style", "glow_orbital"),
+        icon_key=spec.get("icon_key"),
     )
 
 

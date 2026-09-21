@@ -14,14 +14,18 @@ from render_post_asset import (  # noqa: E402
     W, H, NAVY, NAVY_DEEP, MAGENTA, WHITE, LIGHT_BLUE, MARGIN,
     display_font, text_font, wrap_text,
 )
+from icon_assets import composite_icon  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def render_slide(kind, index, total, title, body_lines, output_path, cta_text=None, subcta_text=None,
-                  handle_text=None, number=None):
+                  handle_text=None, number=None, icon_key=None):
     """kind: 'cover' | 'content' | 'cta' | 'stat' | 'comparison' | 'listicle'.
-    number: solo para 'listicle' — el número que va en la insignia."""
+    number: solo para 'listicle' — el número que va en la insignia.
+    icon_key (Bloque 19, Creative Director V2 — opt-in, None por
+    defecto): compone un ícono propio (icon_assets.py) como recurso
+    visual, además del texto — nunca reemplaza el layout de texto."""
     img = Image.new("RGB", (W, H), NAVY)
     draw = ImageDraw.Draw(img)
     for y in range(H):
@@ -30,6 +34,9 @@ def render_slide(kind, index, total, title, body_lines, output_path, cta_text=No
         g = round(NAVY[1] + (NAVY_DEEP[1] - NAVY[1]) * t)
         b = round(NAVY[2] + (NAVY_DEEP[2] - NAVY[2]) * t)
         draw.line([(0, y), (W, y)], fill=(r, g, b))
+    if icon_key:
+        img = composite_icon(img, icon_key, W * 0.68, H * 0.32, scale=1.5, alpha=32)
+        draw = ImageDraw.Draw(img)
     draw.rectangle([0, 0, 14, H], fill=MAGENTA)
 
     max_w = W - 2 * MARGIN
